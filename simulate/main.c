@@ -45,6 +45,9 @@ double v_distance_one(struct Vec v);
 void sim(struct Baseball *my_baseball, double hz);
 struct Vec v_norm(struct Vec v);
 struct Vec v_sub_abs(struct Vec a,struct Vec b);
+struct Vec v_mult_s(struct Vec v,double m);
+struct Vec v_mult(struct Vec a,struct Vec b);
+struct Vec v_divide_s(struct Vec v,double m);
 
 
 
@@ -56,6 +59,15 @@ struct Earth EARTH(){
     e.s.mass=5.972E+24;
     return e;
 };
+
+
+struct Vec v_mult(struct Vec a,struct Vec b){
+        struct Vec v;
+        v.x=a.x*b.x;
+        v.y=a.y*b.y;
+        v.z=a.z*b.z;
+        return v;
+}
 
 struct Vec v_sub(struct Vec a,struct Vec b){
         struct Vec v;
@@ -127,6 +139,26 @@ double v_dot(struct Vec v1,struct Vec v2){
   return v1n.x * v2n.x + v1n.y * v2n.y + v1n.z * v2n.z; 
 }
 
+//vector multtiply by scalar
+struct Vec v_mult_s(struct Vec v,double m){
+    struct Vec vf;
+    vf.x=v.x*m;
+    vf.y=v.y*m;
+    vf.z=v.z*m;
+    return vf;
+}
+
+//vector multtiply by scalar
+struct Vec v_divide_s(struct Vec v,double m){
+    struct Vec vf;
+    vf.x=v.x/m;
+    vf.y=v.y/m;
+    vf.z=v.z/m;
+    return vf;
+}
+
+
+
 //gets realive x,y,z proportion apply to x,y,z
 struct Vec v_prop(struct Vec v1,struct Vec v2){
     struct Vec va =v_sub_abs(v1,v2);
@@ -170,19 +202,32 @@ struct Vec v_norm(struct Vec v){
 	return nv;
 }
 
+
 void sim(struct Baseball *my_baseball, double hz){
     double seconds=1/hz;
     struct Earth e=EARTH();
    // struct Vec d=v_sub(my_baseball->s->center_of_mass,e.s.center_of_mass);
     struct Vec f=v_g_force(e.s,my_baseball->s);
 
-    //my_baseball.velocity+=(f*seconds)/my_baseball.mass;
+    my_baseball->s.velocity=v_add( 
+         my_baseball->s.velocity, 
+         v_divide_s(v_mult_s(f,seconds),my_baseball->s.mass)
+    );
+
+    my_baseball->s.center_of_mass=v_add( 
+      my_baseball->s.center_of_mass, 
+      v_mult_s(my_baseball->s.velocity,seconds)
+    );
+    
+
+   // (f*seconds)/my_baseball.mass;
    // my_baseball->velocity+=(f*seconds)/my_baseball->mass;
 
- printf("%lf",f.x); printf("\n");
- printf("%lf",f.y); printf("\n");
- printf("%lf",f.z); printf("\n");
-    //printf("%lf",my_baseball->velocity); printf("\n");
+    printf("%lf",my_baseball->s.velocity.y); printf("\n");
+    //printf("%lf",my_baseball->s.center_of_mass.x); printf("\n");
+    printf("%lf",my_baseball->s.center_of_mass.y); printf("\n");
+    //printf("%lf",my_baseball->s.center_of_mass.z); printf("\n");
+//  //printf("%lf",my_baseball->velocity); printf("\n");
 }
 
 int main(){
