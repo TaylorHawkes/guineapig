@@ -1,10 +1,12 @@
 #version 110
 
-attribute vec3 position;
+attribute vec4 position;
 varying vec2 texcoord;
+varying vec4 oposition; 
 
 void main()
 {
-    gl_Position = vec4(position, 1.0);
+    gl_Position = position;
     texcoord =vec2(0.5); 
+    oposition = position;
 }

@@ -29,7 +29,7 @@ static struct {
         GLint position;
     } attributes;
 
-    GLfloat fade_factor;
+    float fade_factor;
 } g_resources;
 
 /*
@@ -135,69 +135,219 @@ static GLuint make_program(GLuint vertex_shader, GLuint fragment_shader)
 }
 
 
-void move(GLfloat verts[],int size){
+//todo:make htis work
+void getIndices(float shape,float *indicies){
+	int i=0;
+    for (i = 0; i <= sizeof(shape)/sizeof(float); i++){                                               
+		indicies[i]=i;
+    }
+}
+
+void getRotateXMatrix(float angle,float *r_matrix){
+    float a=angle * (M_PI /180);
+	r_matrix[0]=1;
+	r_matrix[1]=0;
+    r_matrix[2]=0;
+    r_matrix[3]=0;
+
+	r_matrix[4]=0;
+	r_matrix[5]=cos(a); 
+	r_matrix[6]= -1*sin(a); 
+	r_matrix[7]=0; 
+
+	r_matrix[8]=0;
+    r_matrix[9]=sin(a);
+    r_matrix[10]=cos(a);
+    r_matrix[11]=0;
+
+	r_matrix[12]=0;
+	r_matrix[13]=0; 
+	r_matrix[14]=0; 
+	r_matrix[15]=1;
+}
+
+void getRotateYMatrix(float angle,float *r_matrix){
+    //a is radiansl
+    float a=angle * (M_PI /180);
+
+	r_matrix[0]=cos(a); 
+	r_matrix[1]=0;
+    r_matrix[2]=sin(a); 
+    r_matrix[3]=0;
+
+	r_matrix[4]=0;
+	r_matrix[5]=1;
+	r_matrix[6]=0;
+	r_matrix[7]=0; 
+
+	r_matrix[8]=-sin(a);
+    r_matrix[9]=0;
+    r_matrix[10]=cos(a);
+    r_matrix[11]=0;
+
+	r_matrix[12]=0;
+	r_matrix[13]=0; 
+	r_matrix[14]=0; 
+	r_matrix[15]=1;
+
+}
+
+
+
+//This will onlly work with (x,3) * (3*3) matrix
+void multiplyMatrices(float *verticies,float translation[],int verticies_size,int translation_size){
+
+    float result[verticies_size];
+	int verticies_length=(verticies_size/sizeof(float)/4);//rows of m1;
+    int i=0;
+
+    for (i = 0; i < verticies_length; i++) { 
+        float x=verticies[(i*4)+0];
+        float y=verticies[(i*4)+1];
+        float z=verticies[(i*4)+2];
+        float w=verticies[(i*4)+3];
+
+        result[(i*4)+0]=(x*translation[0])+(y*translation[1])+(z*translation[2]) + (w*translation[3]);
+        result[(i*4)+1]=(x*translation[4])+(y*translation[5])+(z*translation[6]) + (w*translation[7]) ;
+        result[(i*4)+2]=(x*translation[8])+(y*translation[9])+(z*translation[10]) + (w*translation[11]);
+        result[(i*4)+3]=(x*translation[12])+(y*translation[13])+(z*translation[14]) + (w*translation[15]);
+    }
+   
+    int t=0;
+	//there must be a better way to do this
+    for (t = 0; t <= (sizeof(result)/sizeof(float)); t++) {
+		verticies[t]=result[t];
+	}
+}
+
+//tay I think this will only work if m2 is a cube because we are looping over its rows not columns
+//This will onlly work with (x,3) * (3*3) matrix
+/*
+void multiplyMatrices(float *m1,float m2[],int m1size,int m2size){
+
+    float result[m1size];
+	int i,j,k;
+	int m1_rows=(m1size/sizeof(float)/3);//rows of m1;
+	int m2_rows=(m2size/sizeof(float)/3);//rows of m1;
+	int m1_cols=3;
+	int m2_cols=3;
+
+	//i is column
+	//loop through  the length of matrix 1 rows
+    for (i = 0; i < m1_rows; i++) {                                                                
+        //result[i] = []; 
+        for (j = 0; j < m2_cols; j++){
+
+            float sum = 0; 
+			//then loop throu lenght of m1 columns
+            for (k = 0; k < m1_cols; k++) {                                                     
+				//so is the m1 row and k m1 and m2 column
+				//j is the m2 column
+                sum += m1[i*3+k] * m2[k*3+j];                                                              
+
+			 //fprintf(stderr,"Adding :%f\n", m2[k*3+j]);
+			 //fprintf(stderr,"Adding :%f\n", m1[i*3+k]);
+            }
+            result[i*3+j] = sum;                                                                          
+        }
+    }
+
+	//there must be a better way to do this
+    for (i = 0; i <= (sizeof(result)/sizeof(float)); i++) {
+		m1[i]=result[i];
+	}
+
+   // return result;                                                                                       
+}                                                                                                        
+*/
+
+
+void move(float verts[],int size){
 	int x=0;	
 
 	 fprintf(stderr, "OpenGL 2.0 not available\n");
-	 fprintf(stderr,"Size of verts:%i\n",sizeof(GLfloat));
+	 //fprintf(stderr,"Size of verts:%i\n",sizeof(float));
 	 fprintf(stderr,"Size of GL Float:%i\n",size);
-
 	 //fprintf(stdout,"COOL\n");
-	for (x=0; x< size/sizeof(GLfloat); ++x) {
-		 fprintf(stderr,"%f\n", verts[x]);
+	for (x=0; x< size/sizeof(float); ++x) {
+        fprintf(stderr,"%f\n", verts[x]);
 	}
 } 
+
+
+////float identity_m[] = { 
+////	 1,0,0,//x = 1*x + 0*y + 0*z 
+////	 0,1,0,//y = 0*x + 1*1 + 0*z 
+////	 0,0,1 //z = 
+////};
+
+
+float identity_m[] = { 
+	 1,0,0,0,//x = 1*x + 0*y + 0*z 
+	 0,1,0,0,//y = 0*x + 1*1 + 0*z 
+	 0,0,1,0,//z = 
+	 0,0,0,1//z = 
+};
 
 /*
  * Data used to seed our vertex array and element array buffers:
  */
- GLfloat g_vertex_buffer_data[] = { 
- 
- // Front face
-  -0.5,-0.5,0.5,
-   0.5,-0.5,0.5,
-   0.5, 0.5,0.5,
-  -0.5, 0.5,0.5,
-  
-  // Back face
-  -0.5, -0.5, -0.5,
-  -0.5,  0.5, -0.5,
-   0.5,  0.5, -0.5,
-   0.5, -0.5, -0.5,
-  
-  // Top face
-  -0.5,  0.5, -0.5,
-  -0.5,  0.5,  0.5,
-   0.5,  0.5,  0.5,
-   0.5,  0.5, -0.5,
-  
-  // Bottom face
-  -0.5, -0.5, -0.5,
-   0.5, -0.5, -0.5,
-   0.5, -0.5,  0.5,
-  -0.5, -0.5,  0.5,
-  
-  // Right face
-   0.5, -0.5, -0.5,
-   0.5,  0.5, -0.5,
-   0.5,  0.5,  0.5,
-   0.5, -0.5,  0.5,
-  
-  // Left face
-  -0.5, -0.5, -0.5,
-  -0.5, -0.5,  0.5,
-  -0.5,  0.5,  0.5,
-  -0.5,  0.5, -0.5
+
+
+ float g_vertex_buffer_data[] = { 
+-0.5,-0.5,-0.5,1,
+-0.5,-0.5, 0.5,1,
+-0.5, 0.5, 0.5, 1,
+0.5, 0.5,-0.5, 1,
+-0.5,-0.5,-0.5,1,
+-0.5, 0.5,-0.5, 1,
+0.5,-0.5, 0.5,1,
+-0.5,-0.5,-0.5,1,
+0.5,-0.5,-0.5,1,
+0.5, 0.5,-0.5,1,
+0.5,-0.5,-0.5,1,
+-0.5,-0.5,-0.5,1,
+-0.5,-0.5,-0.5,1,
+-0.5, 0.5, 0.5,1,
+-0.5, 0.5,-0.5,1,
+0.5,-0.5, 0.5,1,
+-0.5,-0.5, 0.5,1,
+-0.5,-0.5,-0.5,1,
+-0.5, 0.5, 0.5,1,
+-0.5,-0.5, 0.5,1,
+0.5,-0.5, 0.5,1,
+0.5, 0.5, 0.5,1,
+0.5,-0.5,-0.5,1,
+0.5, 0.5,-0.5,1,
+0.5,-0.5,-0.5,1,
+0.5, 0.5, 0.5,1,
+0.5,-0.5, 0.5,1,
+0.5, 0.5, 0.5,1,
+0.5, 0.5,-0.5,1,
+-0.5, 0.5,-0.5,1,
+0.5, 0.5, 0.5,1,
+-0.5, 0.5,-0.5,1,
+-0.5, 0.5, 0.5,1,
+0.5, 0.5, 0.5,1,
+-0.5, 0.5, 0.5,1,
+0.5,-0.5, 0.5,1
 };
 
-
+/// static const GLushort g_element_buffer_data[] = {
+///   0,  1,  2,      0,  2,  3,    // front
+///   4,  5,  6,      4,  6,  7,    // back
+///   8,  9,  10,     8,  10, 11,   // top
+///   12, 13, 14,     12, 14, 15,   // bottom
+///   16, 17, 18,     16, 18, 19,   // right
+///   20, 21, 22,     20, 22, 23    // left
+/// };
 static const GLushort g_element_buffer_data[] = {
-  0,  1,  2,      0,  2,  3,    // front
-  4,  5,  6,      4,  6,  7,    // back
-  8,  9,  10,     8,  10, 11,   // top
-  12, 13, 14,     12, 14, 15,   // bottom
-  16, 17, 18,     16, 18, 19,   // right
-  20, 21, 22,     20, 22, 23    // left
+  0,  1,  2,      3,  4,  5,    // front
+  6,  7,  8,      9,  10, 11,    // back
+  12, 13, 14,     15, 16, 17,   // top
+  18, 19, 20,     21, 22, 23,   // bottom
+  24, 25, 26,     27, 28, 29,   // right
+  30, 31, 32,     33, 34, 35    // left
 };
 
 /*
@@ -280,18 +430,20 @@ static void render(void)
     glBindBuffer(GL_ARRAY_BUFFER, g_resources.vertex_buffer);
     glVertexAttribPointer(
         g_resources.attributes.position,  /* attribute */
-        3,                                /* size */
+        4,                                /* size */
         GL_FLOAT,                         /* type */
         GL_FALSE,                         /* normalized? */
-        sizeof(GLfloat)*3,                /* stride */
+        sizeof(float)*4,                /* stride */
         (void*)0                          /* array buffer offset */
     );
+
     glEnableVertexAttribArray(g_resources.attributes.position);
 
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, g_resources.element_buffer);
     glDrawElements(
         GL_TRIANGLES,  /* mode */
-        8,                  /* count */
+        //GL_LINES,  /* mode */
+        sizeof(g_vertex_buffer_data)/sizeof(float), /* count */
         GL_UNSIGNED_SHORT,  /* type */
         (void*)0            /* element array buffer offset */
     );
@@ -306,11 +458,32 @@ static void render(void)
 int main(int argc, char** argv)
 {
 
-	move(g_vertex_buffer_data,sizeof(g_vertex_buffer_data));
+	//move(g_vertex_buffer_data,sizeof(g_vertex_buffer_data));
+//        multiplyMatrices(&g_vertex_buffer_data,identity_m,sizeof(g_vertex_buffer_data),sizeof(identity_m));
+    
+float r_matrix_y[16];
+getRotateYMatrix(45,&r_matrix_y);
+multiplyMatrices(&g_vertex_buffer_data,r_matrix_y,sizeof(g_vertex_buffer_data),sizeof(r_matrix_y));
+
+float r_matrix_x[16];
+getRotateXMatrix(45,&r_matrix_x);
+multiplyMatrices(&g_vertex_buffer_data,r_matrix_x,sizeof(g_vertex_buffer_data),sizeof(r_matrix_x));
+
+
+
+
+fprintf(stderr, "%f,",g_vertex_buffer_data[0]); fprintf(stderr, "%f,",g_vertex_buffer_data[1]); fprintf(stderr, "%f\n",g_vertex_buffer_data[2]); fprintf(stderr, "%f\n",g_vertex_buffer_data[4]);
+
+
+
+//  float r_matrix_x[9];
+//  getRotateYMatrix(40,&r_matrix_x);
+//  multiplyMatrices(&g_vertex_buffer_data,r_matrix_x,sizeof(g_vertex_buffer_data),sizeof(r_matrix_x));
+
 
     glutInit(&argc, argv);
     glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE);
-    glutInitWindowSize(400, 300);
+    glutInitWindowSize(1000, 1000);
     glutCreateWindow("Hello World");
     //glutIdleFunc(&update_fade_factor);
     glutDisplayFunc(&render);
