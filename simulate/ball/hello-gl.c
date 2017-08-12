@@ -14,6 +14,14 @@
  */
 
 
+int mouse_state,mouse_button;
+float move_x=0;
+float move_y=0;
+float rotate_x=0;
+float rotate_y=0;
+int old_x=0;
+int old_y=0;
+
 
 static struct {
     GLuint vertex_buffer, element_buffer;
@@ -23,6 +31,7 @@ static struct {
     struct {
         GLint fade_factor;
         GLint textures[2];
+        GLint Vmatrix;
     } uniforms;
 
     struct {
@@ -30,6 +39,8 @@ static struct {
     } attributes;
 
     float fade_factor;
+    GLfloat Vmatrix[16];
+
 } g_resources;
 
 /*
@@ -262,6 +273,7 @@ void multiplyMatrices(float *m1,float m2[],int m1size,int m2size){
 */
 
 
+
 void move(float verts[],int size){
 	int x=0;	
 
@@ -392,11 +404,12 @@ static int make_resources(void)
 
     g_resources.uniforms.fade_factor
         = glGetUniformLocation(g_resources.program, "fade_factor");
+    g_resources.uniforms.Vmatrix
+        = glGetUniformLocation(g_resources.program, "Vmatrix");
     g_resources.uniforms.textures[0]
         = glGetUniformLocation(g_resources.program, "textures[0]");
     g_resources.uniforms.textures[1]
         = glGetUniformLocation(g_resources.program, "textures[1]");
-
     g_resources.attributes.position
         = glGetAttribLocation(g_resources.program, "position");
 
@@ -413,11 +426,38 @@ static void update_fade_factor(void)
     glutPostRedisplay();
 }
 
+//this is the function getting called a bunch
 static void render(void)
 {
-    glUseProgram(g_resources.program);
+    
+	glFlush();//clear
+	glClearColor(1.0,1.0,1.0,1.0);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	
 
+    glUseProgram(g_resources.program);
     glUniform1f(g_resources.uniforms.fade_factor, g_resources.fade_factor);
+    getRotateXMatrix(-rotate_x,&g_resources.Vmatrix); 
+
+   float temp_rotate_matrix[16];
+   getRotateYMatrix(rotate_y,&temp_rotate_matrix); 
+
+   multiplyMatrices(&g_resources.Vmatrix,temp_rotate_matrix,sizeof(g_resources.Vmatrix),sizeof(temp_rotate_matrix));
+
+////getRotateXMatrix(45,&r_matrix_x);
+
+
+
+    //set Vmatrix
+    glUniformMatrix4fv(
+            g_resources.uniforms.Vmatrix,
+            1,
+            GL_FALSE,
+            &g_resources.Vmatrix
+    );
+    //uniformMatrix4fv
+    //uniformMatrix4fv
+    
     
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, g_resources.textures[0]);
@@ -426,6 +466,9 @@ static void render(void)
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, g_resources.textures[1]);
     glUniform1i(g_resources.uniforms.textures[1], 1);
+
+
+
 
     glBindBuffer(GL_ARRAY_BUFFER, g_resources.vertex_buffer);
     glVertexAttribPointer(
@@ -437,9 +480,11 @@ static void render(void)
         (void*)0                          /* array buffer offset */
     );
 
+
     glEnableVertexAttribArray(g_resources.attributes.position);
 
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, g_resources.element_buffer);
+
     glDrawElements(
         GL_TRIANGLES,  /* mode */
         //GL_LINES,  /* mode */
@@ -452,6 +497,31 @@ static void render(void)
     glutSwapBuffers();
 }
 
+
+
+void mouse(int button, int state, int x, int y)
+{
+	mouse_state =state;
+	mouse_button =button;
+    old_x = x; 
+  	old_y = y;
+}
+
+void motion(int x, int y) {
+	if (mouse_state == GLUT_DOWN){
+
+            rotate_x += (y-old_y)*50*M_PI/1000;
+			rotate_y +=  (x-old_x)*50*M_PI/1000;
+			//fprintf(stderr," x old  is at:%f\n",rotate_x);
+			//fprintf(stderr," x is at:%i\n",x);
+			//fprintf(stderr,"rotate x is at:%i\n",rotate_x);
+			old_x=x;
+			old_y=y;
+			glutPostRedisplay();
+	}
+}
+
+
 /*
  * Entry point
  */
@@ -461,18 +531,9 @@ int main(int argc, char** argv)
 	//move(g_vertex_buffer_data,sizeof(g_vertex_buffer_data));
 //        multiplyMatrices(&g_vertex_buffer_data,identity_m,sizeof(g_vertex_buffer_data),sizeof(identity_m));
     
-float r_matrix_y[16];
-getRotateYMatrix(45,&r_matrix_y);
-multiplyMatrices(&g_vertex_buffer_data,r_matrix_y,sizeof(g_vertex_buffer_data),sizeof(r_matrix_y));
-
-float r_matrix_x[16];
-getRotateXMatrix(45,&r_matrix_x);
-multiplyMatrices(&g_vertex_buffer_data,r_matrix_x,sizeof(g_vertex_buffer_data),sizeof(r_matrix_x));
 
 
-
-
-fprintf(stderr, "%f,",g_vertex_buffer_data[0]); fprintf(stderr, "%f,",g_vertex_buffer_data[1]); fprintf(stderr, "%f\n",g_vertex_buffer_data[2]); fprintf(stderr, "%f\n",g_vertex_buffer_data[4]);
+//fprintf(stderr, "%f,",g_vertex_buffer_data[0]); fprintf(stderr, "%f,",g_vertex_buffer_data[1]); fprintf(stderr, "%f\n",g_vertex_buffer_data[2]); fprintf(stderr, "%f\n",g_vertex_buffer_data[4]);
 
 
 
@@ -487,6 +548,11 @@ fprintf(stderr, "%f,",g_vertex_buffer_data[0]); fprintf(stderr, "%f,",g_vertex_b
     glutCreateWindow("Hello World");
     //glutIdleFunc(&update_fade_factor);
     glutDisplayFunc(&render);
+
+    //used to detect stuff
+    glutMouseFunc(mouse);
+    glutMotionFunc(motion);
+
 
     glewInit();
     if (!GLEW_VERSION_2_0) {
