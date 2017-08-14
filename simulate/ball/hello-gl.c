@@ -21,10 +21,11 @@ float rotate_x=0;
 float rotate_y=0;
 int old_x=0;
 int old_y=0;
+int zoom=0;
 
 
 static struct {
-    GLuint vertex_buffer, element_buffer;
+    GLuint vertex_buffer, element_buffer, normals_buffer;
     GLuint textures[2];
     GLuint vertex_shader, fragment_shader, program;
     
@@ -32,14 +33,19 @@ static struct {
         GLint fade_factor;
         GLint textures[2];
         GLint Vmatrix;
+        GLint Pmatrix;
+        GLint Mmatrix;
     } uniforms;
 
     struct {
         GLint position;
+        GLint normal;
     } attributes;
 
     float fade_factor;
     GLfloat Vmatrix[16];
+    GLfloat Pmatrix[16];
+    GLfloat Mmatrix[16];
 
 } g_resources;
 
@@ -203,9 +209,159 @@ void getRotateYMatrix(float angle,float *r_matrix){
 
 }
 
+void getViewMatrix(float *r_matrix){
+	r_matrix[0]=1;
+	r_matrix[1]=0;
+    r_matrix[2]=0;
+    r_matrix[3]=0;//x
+
+	r_matrix[4]=0;
+	r_matrix[5]=1;
+	r_matrix[6]=0;
+	r_matrix[7]=0; //y
+
+	r_matrix[8]=0;
+    r_matrix[9]=0;
+    r_matrix[10]=1;
+    r_matrix[11]=0;//z???
+
+	r_matrix[12]=0;//x, or w/out transpose
+	r_matrix[13]=0;//y,
+	r_matrix[14]=-10;//z
+	r_matrix[15]=1;
+}
+
+void getModelMatrix( float *r_matrix){
+	r_matrix[0]=1;
+	r_matrix[1]=0;
+    r_matrix[2]=0;
+    r_matrix[3]=0;//x
+
+	r_matrix[4]=0;
+	r_matrix[5]=1;
+	r_matrix[6]=0;
+	r_matrix[7]=0; //y
+
+	r_matrix[8]=0;
+    r_matrix[9]=0;
+    r_matrix[10]=1;
+    r_matrix[11]=0;//z???
+
+	r_matrix[12]=0;//x, or w/out transpose
+	r_matrix[13]=0;//y,
+	r_matrix[14]=0;//z
+	r_matrix[15]=1;
+}
+
+void getProjectionMatrixThree(float *r_matrix,float fov,float aspect, float near,float far)
+{
+    float D2R = M_PI / 180.0;
+    float yScale = 1.0 / tan(D2R * fov / 2);
+    float xScale = yScale / aspect;
+    float nearmfar = near - far;
+    
+	float m[] = {
+        xScale, 0, 0, 0,
+        0, yScale, 0, 0,
+        0, 0, (far + near) / nearmfar, -1,
+        0, 0, 2*far*near / nearmfar, 0 
+    };    
+    memcpy(r_matrix, m, sizeof(float)*16);
+}
 
 
-//This will onlly work with (x,3) * (3*3) matrix
+void getProjectionMatrixTwo( float *r_matrix,float angleOfView,float imageAspectRatio, float zMin,float zMax)
+{
+
+	float ang = tan((angleOfView*.5)*M_PI/180);//angle*.5                                                    
+
+    r_matrix[0] = 0.5/ang; 
+    r_matrix[1] = 0; 
+    r_matrix[2] = 0; 
+    r_matrix[3] = 0; 
+
+    r_matrix[4] = 0; 
+    r_matrix[5] = 0.5*imageAspectRatio/ang;
+    r_matrix[6] = 0; 
+    r_matrix[7] = 0; 
+
+    r_matrix[8] = 0; 
+    r_matrix[9] = 0;
+    r_matrix[10] = -(zMax+zMin)/(zMax-zMin); 
+    r_matrix[11] = -1; 
+
+    r_matrix[12] = 0; 
+    r_matrix[13] = 0; 
+    r_matrix[14] = (-2*zMax*zMin)/(zMax-zMin);
+    r_matrix[15] = 0;  
+
+}
+
+void getProjectionMatrix( float *r_matrix,float angleOfView,float imageAspectRatio, float n,float f){
+
+    float scale = tan(angleOfView * 0.5 * M_PI / 180) * n; 
+    float r = imageAspectRatio * scale;
+    float l = -r; 
+    float t = scale;
+    float b = -t; 
+
+    r_matrix[0] = 2 * n / (r - l); 
+    r_matrix[1] = 0; 
+    r_matrix[2] = 0; 
+    r_matrix[3] = 0; 
+
+    r_matrix[4] = 0; 
+    r_matrix[5] = 2 * n / (t - b); 
+    r_matrix[6] = 0; 
+    r_matrix[7] = 0; 
+
+    r_matrix[8] = (r + l) / (r - l); 
+    r_matrix[9] = (t + b) / (t - b); 
+    r_matrix[10] = -(f + n) / (f - n); 
+    r_matrix[11] = -1; 
+
+    r_matrix[12] = 0; 
+    r_matrix[13] = 0; 
+    r_matrix[14] = -2 * f * n / (f - n); 
+    r_matrix[15] = 0; 
+}
+
+
+void getNormals(float *normals,float verticies[],int verticies_size){
+
+////-1.0,-1.0,-1.0,1, x
+////-1.0,-1.0, 1.0,1, y
+////-1.0, 1.0, 1.0, 1, z
+
+	int verticies_length=(verticies_size/sizeof(float)/4);//rows of m1;
+
+//	float normals[verticies_length*(3/4)];
+	int i=0;
+    for (i = 0; i < verticies_length/4; i++) {
+
+		float U0 = verticies[i*4+1+0]-verticies[i*4+0+0];
+		float U1 = verticies[i*4+1+1]-verticies[i*4+0+1];
+		float U2 = verticies[i*4+1+2]-verticies[i*4+0+2];
+
+		float V0 = verticies[i*4+2+0]-verticies[i*4+0+0];
+		float V1 = verticies[i*4+2+1]-verticies[i*4+0+1];
+		float V2 = verticies[i*4+2+2]-verticies[i*4+0+2];
+
+
+        float x=(U1*V2)-(U2*V1);
+        float y=(U2*V0)-(U0*V2);
+        float z=(U0*V1)-(U1*V0);
+		normals[i*3]=x;
+		normals[i*3+1]=y;
+		normals[i*3+2]=z;
+    }
+
+
+} 
+
+
+
+//This will onlly work with (x,4) * (4*4) matrix
 void multiplyMatrices(float *verticies,float translation[],int verticies_size,int translation_size){
 
     float result[verticies_size];
@@ -307,42 +463,81 @@ float identity_m[] = {
 
 
  float g_vertex_buffer_data[] = { 
--0.5,-0.5,-0.5,1,
--0.5,-0.5, 0.5,1,
--0.5, 0.5, 0.5, 1,
-0.5, 0.5,-0.5, 1,
--0.5,-0.5,-0.5,1,
--0.5, 0.5,-0.5, 1,
-0.5,-0.5, 0.5,1,
--0.5,-0.5,-0.5,1,
-0.5,-0.5,-0.5,1,
-0.5, 0.5,-0.5,1,
-0.5,-0.5,-0.5,1,
--0.5,-0.5,-0.5,1,
--0.5,-0.5,-0.5,1,
--0.5, 0.5, 0.5,1,
--0.5, 0.5,-0.5,1,
-0.5,-0.5, 0.5,1,
--0.5,-0.5, 0.5,1,
--0.5,-0.5,-0.5,1,
--0.5, 0.5, 0.5,1,
--0.5,-0.5, 0.5,1,
-0.5,-0.5, 0.5,1,
-0.5, 0.5, 0.5,1,
-0.5,-0.5,-0.5,1,
-0.5, 0.5,-0.5,1,
-0.5,-0.5,-0.5,1,
-0.5, 0.5, 0.5,1,
-0.5,-0.5, 0.5,1,
-0.5, 0.5, 0.5,1,
-0.5, 0.5,-0.5,1,
--0.5, 0.5,-0.5,1,
-0.5, 0.5, 0.5,1,
--0.5, 0.5,-0.5,1,
--0.5, 0.5, 0.5,1,
-0.5, 0.5, 0.5,1,
--0.5, 0.5, 0.5,1,
-0.5,-0.5, 0.5,1
+-1.0,-1.0,-1.0,1,
+-1.0,-1.0, 1.0,1,
+-1.0, 1.0, 1.0, 1,
+1.0, 1.0,-1.0, 1,
+-1.0,-1.0,-1.0,1,
+-1.0, 1.0,-1.0, 1,
+1.0,-1.0, 1.0,1,
+-1.0,-1.0,-1.0,1,
+1.0,-1.0,-1.0,1,
+1.0, 1.0,-1.0,1,
+1.0,-1.0,-1.0,1,
+-1.0,-1.0,-1.0,1,
+-1.0,-1.0,-1.0,1,
+-1.0, 1.0, 1.0,1,
+-1.0, 1.0,-1.0,1,
+1.0,-1.0, 1.0,1,
+-1.0,-1.0, 1.0,1,
+-1.0,-1.0,-1.0,1,
+-1.0, 1.0, 1.0,1,
+-1.0,-1.0, 1.0,1,
+1.0,-1.0, 1.0,1,
+1.0, 1.0, 1.0,1,
+1.0,-1.0,-1.0,1,
+1.0, 1.0,-1.0,1,
+1.0,-1.0,-1.0,1,
+1.0, 1.0, 1.0,1,
+1.0,-1.0, 1.0,1,
+1.0, 1.0, 1.0,1,
+1.0, 1.0,-1.0,1,
+-1.0, 1.0,-1.0,1,
+1.0, 1.0, 1.0,1,
+-1.0, 1.0,-1.0,1,
+-1.0, 1.0, 1.0,1,
+1.0, 1.0, 1.0,1,
+-1.0, 1.0, 1.0,1,
+1.0,-1.0, 1.0,1
+};
+
+float g_normals_buffer_data[] = { 
+	-1.0,-1.0,-1.0,
+	-1.0,-1.0, 1.0,
+	-1.0, 1.0, 1.0,
+	1.0, 1.0,-1.0,
+	-1.0,-1.0,-1.0,
+	-1.0, 1.0,-1.0,
+	1.0,-1.0, 1.0,
+	-1.0,-1.0,-1.0,
+	1.0,-1.0,-1.0,
+	1.0, 1.0,-1.0,
+	1.0,-1.0,-1.0,
+	-1.0,-1.0,-1.0,
+	-1.0,-1.0,-1.0,
+	-1.0, 1.0, 1.0,
+	-1.0, 1.0,-1.0,
+	1.0,-1.0, 1.0,
+	-1.0,-1.0, 1.0,
+	-1.0,-1.0,-1.0,
+	-1.0, 1.0, 1.0,
+	-1.0,-1.0, 1.0,
+	1.0,-1.0, 1.0,
+	1.0, 1.0, 1.0,
+	1.0,-1.0,-1.0,
+	1.0, 1.0,-1.0,
+	1.0,-1.0,-1.0,
+	1.0, 1.0, 1.0,
+	1.0,-1.0, 1.0,
+	1.0, 1.0, 1.0,
+	1.0, 1.0,-1.0,
+	-1.0, 1.0,-1.0,
+	1.0, 1.0, 1.0,
+	-1.0, 1.0,-1.0,
+	-1.0, 1.0, 1.0,
+	1.0, 1.0, 1.0,
+	-1.0, 1.0, 1.0,
+	1.0,-1.0, 1.0
 };
 
 /// static const GLushort g_element_buffer_data[] = {
@@ -372,6 +567,28 @@ static int make_resources(void)
         g_vertex_buffer_data,
         sizeof(g_vertex_buffer_data)
     );
+
+	//just initialte with verticies
+	getNormals(&g_normals_buffer_data,g_vertex_buffer_data,sizeof(g_vertex_buffer_data));
+
+
+	
+	fprintf(stderr," x old  is at:%f\n",g_normals_buffer_data[0]);
+	fprintf(stderr," x old  is at:%f\n",g_normals_buffer_data[1]);
+	fprintf(stderr," x old  is at:%f\n",g_normals_buffer_data[2]);
+	fprintf(stderr," x old  is at:%f\n",g_normals_buffer_data[3]);
+	fprintf(stderr," x old  is at:%f\n",g_normals_buffer_data[5]);
+	fprintf(stderr," x old  is at:%f\n",g_normals_buffer_data[6]);
+	fprintf(stderr," x old  is at:%f\n",g_normals_buffer_data[7]);
+	fprintf(stderr," x old  is at:%f\n",g_normals_buffer_data[8]);
+	fprintf(stderr," x old  is at:%f\n",g_normals_buffer_data[9]);
+
+	g_resources.normals_buffer = make_buffer(
+        GL_ARRAY_BUFFER,
+        g_normals_buffer_data,
+        sizeof(g_normals_buffer_data)
+    );
+
     g_resources.element_buffer = make_buffer(
         GL_ELEMENT_ARRAY_BUFFER,
         g_element_buffer_data,
@@ -402,16 +619,15 @@ static int make_resources(void)
     if (g_resources.program == 0)
         return 0;
 
-    g_resources.uniforms.fade_factor
-        = glGetUniformLocation(g_resources.program, "fade_factor");
-    g_resources.uniforms.Vmatrix
-        = glGetUniformLocation(g_resources.program, "Vmatrix");
-    g_resources.uniforms.textures[0]
-        = glGetUniformLocation(g_resources.program, "textures[0]");
-    g_resources.uniforms.textures[1]
-        = glGetUniformLocation(g_resources.program, "textures[1]");
-    g_resources.attributes.position
-        = glGetAttribLocation(g_resources.program, "position");
+    g_resources.uniforms.fade_factor = glGetUniformLocation(g_resources.program, "fade_factor");
+    g_resources.uniforms.Vmatrix = glGetUniformLocation(g_resources.program, "Vmatrix");
+	g_resources.uniforms.Pmatrix = glGetUniformLocation(g_resources.program, "Pmatrix");
+	g_resources.uniforms.Mmatrix = glGetUniformLocation(g_resources.program, "Mmatrix");
+    g_resources.uniforms.textures[0] = glGetUniformLocation(g_resources.program, "textures[0]");
+    g_resources.uniforms.textures[1] = glGetUniformLocation(g_resources.program, "textures[1]");
+    g_resources.attributes.position = glGetAttribLocation(g_resources.program, "position");
+    g_resources.attributes.normal = glGetAttribLocation(g_resources.program, "normal");
+
 
     return 1;
 }
@@ -437,16 +653,34 @@ static void render(void)
 
     glUseProgram(g_resources.program);
     glUniform1f(g_resources.uniforms.fade_factor, g_resources.fade_factor);
-    getRotateXMatrix(-rotate_x,&g_resources.Vmatrix); 
 
-   float temp_rotate_matrix[16];
-   getRotateYMatrix(rotate_y,&temp_rotate_matrix); 
+    getViewMatrix(&g_resources.Vmatrix); //start at -10z
 
-   multiplyMatrices(&g_resources.Vmatrix,temp_rotate_matrix,sizeof(g_resources.Vmatrix),sizeof(temp_rotate_matrix));
+
+
+   getModelMatrix(&g_resources.Mmatrix); 
+
+   //y, axes rotation -- we rotate the model not the view
+   float r_y_m[16];
+   getRotateYMatrix(rotate_y,&r_y_m); 
+   multiplyMatrices(&g_resources.Mmatrix,r_y_m,sizeof(g_resources.Mmatrix),sizeof(r_y_m));
+
+   float r_x_m[16];
+   getRotateXMatrix(rotate_x,&r_x_m); 
+   multiplyMatrices(&g_resources.Mmatrix,r_x_m,sizeof(g_resources.Mmatrix),sizeof(r_x_m));
+
+
 
 ////getRotateXMatrix(45,&r_matrix_x);
 
+	//projection matrix
 
+	 glUniformMatrix4fv(
+			  g_resources.uniforms.Mmatrix,
+			  1,
+			  GL_FALSE,
+			  &g_resources.Mmatrix
+	  );
 
     //set Vmatrix
     glUniformMatrix4fv(
@@ -455,9 +689,19 @@ static void render(void)
             GL_FALSE,
             &g_resources.Vmatrix
     );
-    //uniformMatrix4fv
-    //uniformMatrix4fv
-    
+
+   getProjectionMatrixTwo(&g_resources.Pmatrix, 40+(zoom*2), 1, .1, 3000); 
+
+   glUniformMatrix4fv(
+            g_resources.uniforms.Pmatrix,
+            1,
+            GL_FALSE,
+            &g_resources.Pmatrix
+    );
+
+  
+
+
     
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, g_resources.textures[0]);
@@ -466,7 +710,6 @@ static void render(void)
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, g_resources.textures[1]);
     glUniform1i(g_resources.uniforms.textures[1], 1);
-
 
 
 
@@ -479,9 +722,23 @@ static void render(void)
         sizeof(float)*4,                /* stride */
         (void*)0                          /* array buffer offset */
     );
-
-
     glEnableVertexAttribArray(g_resources.attributes.position);
+
+
+	//refresh the normals the light is stagnent elsewhere
+
+	//bind the normals buffer
+    glBindBuffer(GL_ARRAY_BUFFER, g_resources.normals_buffer);
+    glVertexAttribPointer(
+        g_resources.attributes.normal,  /* attribute */
+        3,                                /* size */
+        GL_FLOAT,                         /* type */
+        GL_FALSE,                        /* normalized? */
+        sizeof(float)*3,                /* stride */
+        (void*)0                          /* array buffer offset */
+    );
+    glEnableVertexAttribArray(g_resources.attributes.normal);
+
 
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, g_resources.element_buffer);
 
@@ -494,6 +751,7 @@ static void render(void)
     );
 
     glDisableVertexAttribArray(g_resources.attributes.position);
+    glDisableVertexAttribArray(g_resources.attributes.normal);
     glutSwapBuffers();
 }
 
@@ -501,6 +759,7 @@ static void render(void)
 
 void mouse(int button, int state, int x, int y)
 {
+
 	mouse_state =state;
 	mouse_button =button;
     old_x = x; 
@@ -521,6 +780,15 @@ void motion(int x, int y) {
 	}
 }
 
+void keyPressed (unsigned char key, int x, int y)
+{
+    if (key == 'j') {
+         zoom=zoom+1;
+    } else if(key=='k'){
+         zoom=zoom-1;
+    }
+	glutPostRedisplay();
+}
 
 /*
  * Entry point
@@ -552,6 +820,8 @@ int main(int argc, char** argv)
     //used to detect stuff
     glutMouseFunc(mouse);
     glutMotionFunc(motion);
+	glutKeyboardFunc(keyPressed);
+
 
 
     glewInit();

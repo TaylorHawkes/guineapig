@@ -235,7 +235,7 @@ int main(){
 struct timespec last, now;
 clock_gettime(CLOCK_MONOTONIC, &last);
 double elapsed = 0;
-double hz=1;// run simulation 100 times per second
+double hz=100;// run simulation 100 times per second
 
 struct Baseball my_baseball;
 my_baseball.s.center_of_mass.x=0;
