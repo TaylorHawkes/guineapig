@@ -9,10 +9,218 @@
 #include <stdio.h>
 #include "util.h"
 
+
+typedef struct {
+  float *verticies;
+  float *normals;
+  short *indicies;//todo-malloc this is not working
+  int verts_size_of; //store size_of verts/we use malloc and loose this
+  int indicies_size_of;
+  int normals_size_of;
+ // float (*build_verticies)(const Shape *shape);
+} Shape;
+
+//  float shape_build_verticies(const Shape *s)
+//  {
+//    return s->build_verticies(s);
+//  }
+
+typedef struct {
+  Shape s;
+} Cube;
+
+typedef struct {
+  Shape s;
+} Sphere;
+
+Shape *shapes[20];
+int shape_count=0;
+
+
+static float cube_build_verticies(const Shape *s)
+{
+  Cube *cube = (Cube *) s;//I think this is the magic where we caset
+ //rect->veritices=[1,23,34]
+}
+
+void getNormals(float *normals,float verticies[],int verticies_size){
+	int verticies_length=(verticies_size/sizeof(float)/4);//rows of m1;
+
+	int i=0;
+    for (i = 0; i < verticies_length/4; i++) {
+
+		float U0 = verticies[i*4+1+0]-verticies[i*4+0+0];
+		float U1 = verticies[i*4+1+1]-verticies[i*4+0+1];
+		float U2 = verticies[i*4+1+2]-verticies[i*4+0+2];
+
+		float V0 = verticies[i*4+2+0]-verticies[i*4+0+0];
+		float V1 = verticies[i*4+2+1]-verticies[i*4+0+1];
+		float V2 = verticies[i*4+2+2]-verticies[i*4+0+2];
+
+
+        float x=(U1*V2)-(U2*V1);
+        float y=(U2*V0)-(U0*V2);
+        float z=(U0*V1)-(U1*V0);
+		normals[i*3]=x;
+		normals[i*3+1]=y;
+		normals[i*3+2]=z;
+    }
+
+} 
+
+
+
+//todo:make htis work
+void get_indices(short *indicies ,int indicies_size){
+	int i=0;
+    for (i = 0; i < indicies_size/sizeof(short); i++){ 
+		indicies[i]=(short) i;
+    }
+}
+
+
+void new_sphere(Sphere *sphere,float radius,float start_x, float start_y, float start_z){
+	int latitudeBands = 20;
+	int longitudeBands = 20;
+	float *verticies;
+
+	int verts_size_of=(latitudeBands+1) * (longitudeBands+1) * 4 * sizeof(float);
+
+	verticies=(float *) malloc(verts_size_of);
+	fprintf(stderr,"v index: %i\n",verts_size_of);
+	int latNumber=0;
+    int v_index=0;
+     for (latNumber = 0; latNumber <= latitudeBands; latNumber++) {                                 
+       float theta = latNumber * M_PI / latitudeBands;                                                 
+       float sinTheta = sin(theta);                                                                  
+       float cosTheta = cos(theta);
+		int longNumber=0;
+       for (longNumber = 0; longNumber <= longitudeBands; longNumber++) {                           
+         float phi = longNumber * 2 * M_PI / longitudeBands;                                           
+         float sinPhi = sin(phi);
+         float cosPhi = cos(phi);                                                                    
+         float x = cosPhi * sinTheta;                                                                     
+         float y = cosTheta;
+         float z = sinPhi * sinTheta;
+		  verticies[v_index]=start_x+x*radius; v_index++;
+		  verticies[v_index]=start_y+y*radius; v_index++;
+		  verticies[v_index]=start_z+z*radius; v_index++;
+		  verticies[v_index]=1; v_index++;
+       } 
+     }
+
+	fprintf(stderr,"v index: %i\n",v_index);
+
+    short *indexData;
+	int index_size_of=(latitudeBands+1) * (longitudeBands+1) * 6 * sizeof(short);
+	indexData= (short *) malloc(index_size_of);
+
+	 latNumber=0;
+    int i_index=0;
+    for (latNumber = 0; latNumber < latitudeBands; latNumber++) {
+		int longNumber=0;
+       for (longNumber = 0; longNumber < longitudeBands; longNumber++) {                            
+         float first = (latNumber * (longitudeBands + 1)) + longNumber;                                   
+         float second = first + longitudeBands + 1;                                                       
+          
+		//first triangel
+         indexData[i_index]=(short) second;i_index++;
+         indexData[i_index]=(short) first;i_index++;
+         indexData[i_index]=(short) first+1;i_index++;
+
+        //second triangle
+ 		 indexData[i_index]=(short) second+1;i_index++;
+         indexData[i_index]=(short) second;i_index++;
+         indexData[i_index]=(short) first+1;i_index++;
+       }                                                                                                
+     }                                                  
+
+	 sphere->s.verticies=malloc(verts_size_of);
+	 sphere->s.verts_size_of=verts_size_of;
+	 memcpy(sphere->s.verticies, verticies, verts_size_of);
+
+	 sphere->s.indicies=malloc(index_size_of);
+	 sphere->s.indicies_size_of=index_size_of;
+	 memcpy(sphere->s.indicies, indexData, index_size_of);
+
+     
+///  var verts_final=[]; 
+///  for (var i = 0; i < indexData.length; i++) {
+///      verts_final.push(verticies[indexData[i]]);                                                     
+///  }
+
+}
+
+void new_cube(Cube *cube)
+{
+    float v[]={
+        -1.0,-1.0,-1.0,1,
+        -1.0,-1.0, 1.0,1,
+        -1.0, 1.0, 1.0, 1,
+        1.0, 1.0,-1.0, 1,
+        -1.0,-1.0,-1.0,1,
+        -1.0, 1.0,-1.0, 1,
+        1.0,-1.0, 1.0,1,
+        -1.0,-1.0,-1.0,1,
+        1.0,-1.0,-1.0,1,
+        1.0, 1.0,-1.0,1,
+        1.0,-1.0,-1.0,1,
+        -1.0,-1.0,-1.0,1,
+        -1.0,-1.0,-1.0,1,
+        -1.0, 1.0, 1.0,1,
+        -1.0, 1.0,-1.0,1,
+        1.0,-1.0, 1.0,1,
+        -1.0,-1.0, 1.0,1,
+        -1.0,-1.0,-1.0,1,
+        -1.0, 1.0, 1.0,1,
+        -1.0,-1.0, 1.0,1,
+        1.0,-1.0, 1.0,1,
+        1.0, 1.0, 1.0,1,
+        1.0,-1.0,-1.0,1,
+        1.0, 1.0,-1.0,1,
+        1.0,-1.0,-1.0,1,
+        1.0, 1.0, 1.0,1,
+        1.0,-1.0, 1.0,1,
+        1.0, 1.0, 1.0,1,
+        1.0, 1.0,-1.0,1,
+        -1.0, 1.0,-1.0,1,
+        1.0, 1.0, 1.0,1,
+        -1.0, 1.0,-1.0,1,
+        -1.0, 1.0, 1.0,1,
+        1.0, 1.0, 1.0,1,
+        -1.0, 1.0, 1.0,1,
+        1.0,-1.0, 1.0,1
+    };
+
+    //populate the verts
+    cube->s.verticies=malloc(sizeof(v));
+    cube->s.verts_size_of=sizeof(v);
+    memcpy(cube->s.verticies, v, sizeof(v));
+
+    //populate the indicies
+    int size_of_indicies=sizeof(short) * (sizeof(v)/sizeof(float)) / 4;
+    cube->s.indicies=malloc(size_of_indicies);
+    cube->s.indicies_size_of=size_of_indicies;
+    short t_indicies[size_of_indicies];
+    get_indices(&t_indicies,size_of_indicies);
+    memcpy(cube->s.indicies, t_indicies,size_of_indicies);
+    
+    //populate the normalsk
+
+   int size_of_normals=sizeof(v) * 3/4 ;
+
+   fprintf(stderr, "Normals sizei s %i", size_of_normals);
+   cube->s.normals=malloc(size_of_normals);
+   cube->s.normals_size_of=size_of_normals;
+
+   float t_normals[size_of_normals];
+   getNormals(&t_normals,v,sizeof(v));
+   memcpy(cube->s.normals, t_normals, size_of_normals);
+}
+
 /*
  * Global data used by our render callback:
  */
-
 
 int mouse_state,mouse_button;
 float move_x=0;
@@ -22,7 +230,6 @@ float rotate_y=0;
 int old_x=0;
 int old_y=0;
 int zoom=0;
-
 
 static struct {
     GLuint vertex_buffer, element_buffer, normals_buffer;
@@ -90,15 +297,10 @@ static GLuint make_texture(const char *filename)
     return texture;
 }
 
-static void show_info_log(
-    GLuint object,
-    PFNGLGETSHADERIVPROC glGet__iv,
-    PFNGLGETSHADERINFOLOGPROC glGet__InfoLog
-)
+static void show_info_log( GLuint object, PFNGLGETSHADERIVPROC glGet__iv, PFNGLGETSHADERINFOLOGPROC glGet__InfoLog)
 {
     GLint log_length;
     char *log;
-
     glGet__iv(object, GL_INFO_LOG_LENGTH, &log_length);
     log = malloc(log_length);
     glGet__InfoLog(object, log_length, NULL, log);
@@ -152,13 +354,7 @@ static GLuint make_program(GLuint vertex_shader, GLuint fragment_shader)
 }
 
 
-//todo:make htis work
-void getIndices(float shape,float *indicies){
-	int i=0;
-    for (i = 0; i <= sizeof(shape)/sizeof(float); i++){                                               
-		indicies[i]=i;
-    }
-}
+
 
 void getRotateXMatrix(float angle,float *r_matrix){
     float a=angle * (M_PI /180);
@@ -213,21 +409,21 @@ void getViewMatrix(float *r_matrix){
 	r_matrix[0]=1;
 	r_matrix[1]=0;
     r_matrix[2]=0;
-    r_matrix[3]=0;//x
+    r_matrix[3]=0;
 
 	r_matrix[4]=0;
 	r_matrix[5]=1;
 	r_matrix[6]=0;
-	r_matrix[7]=0; //y
+	r_matrix[7]=0; 
 
 	r_matrix[8]=0;
     r_matrix[9]=0;
     r_matrix[10]=1;
-    r_matrix[11]=0;//z???
+    r_matrix[11]=0;
 
-	r_matrix[12]=0;//x, or w/out transpose
-	r_matrix[13]=0;//y,
-	r_matrix[14]=-10;//z
+	r_matrix[12]=0;//x, 
+	r_matrix[13]=-1000;//y,
+	r_matrix[14]=-50;//z
 	r_matrix[15]=1;
 }
 
@@ -253,24 +449,8 @@ void getModelMatrix( float *r_matrix){
 	r_matrix[15]=1;
 }
 
-void getProjectionMatrixThree(float *r_matrix,float fov,float aspect, float near,float far)
-{
-    float D2R = M_PI / 180.0;
-    float yScale = 1.0 / tan(D2R * fov / 2);
-    float xScale = yScale / aspect;
-    float nearmfar = near - far;
-    
-	float m[] = {
-        xScale, 0, 0, 0,
-        0, yScale, 0, 0,
-        0, 0, (far + near) / nearmfar, -1,
-        0, 0, 2*far*near / nearmfar, 0 
-    };    
-    memcpy(r_matrix, m, sizeof(float)*16);
-}
 
-
-void getProjectionMatrixTwo( float *r_matrix,float angleOfView,float imageAspectRatio, float zMin,float zMax)
+void getProjectionMatrix( float *r_matrix,float angleOfView,float imageAspectRatio, float zMin,float zMax)
 {
 
 	float ang = tan((angleOfView*.5)*M_PI/180);//angle*.5                                                    
@@ -296,68 +476,6 @@ void getProjectionMatrixTwo( float *r_matrix,float angleOfView,float imageAspect
     r_matrix[15] = 0;  
 
 }
-
-void getProjectionMatrix( float *r_matrix,float angleOfView,float imageAspectRatio, float n,float f){
-
-    float scale = tan(angleOfView * 0.5 * M_PI / 180) * n; 
-    float r = imageAspectRatio * scale;
-    float l = -r; 
-    float t = scale;
-    float b = -t; 
-
-    r_matrix[0] = 2 * n / (r - l); 
-    r_matrix[1] = 0; 
-    r_matrix[2] = 0; 
-    r_matrix[3] = 0; 
-
-    r_matrix[4] = 0; 
-    r_matrix[5] = 2 * n / (t - b); 
-    r_matrix[6] = 0; 
-    r_matrix[7] = 0; 
-
-    r_matrix[8] = (r + l) / (r - l); 
-    r_matrix[9] = (t + b) / (t - b); 
-    r_matrix[10] = -(f + n) / (f - n); 
-    r_matrix[11] = -1; 
-
-    r_matrix[12] = 0; 
-    r_matrix[13] = 0; 
-    r_matrix[14] = -2 * f * n / (f - n); 
-    r_matrix[15] = 0; 
-}
-
-
-void getNormals(float *normals,float verticies[],int verticies_size){
-
-////-1.0,-1.0,-1.0,1, x
-////-1.0,-1.0, 1.0,1, y
-////-1.0, 1.0, 1.0, 1, z
-
-	int verticies_length=(verticies_size/sizeof(float)/4);//rows of m1;
-
-//	float normals[verticies_length*(3/4)];
-	int i=0;
-    for (i = 0; i < verticies_length/4; i++) {
-
-		float U0 = verticies[i*4+1+0]-verticies[i*4+0+0];
-		float U1 = verticies[i*4+1+1]-verticies[i*4+0+1];
-		float U2 = verticies[i*4+1+2]-verticies[i*4+0+2];
-
-		float V0 = verticies[i*4+2+0]-verticies[i*4+0+0];
-		float V1 = verticies[i*4+2+1]-verticies[i*4+0+1];
-		float V2 = verticies[i*4+2+2]-verticies[i*4+0+2];
-
-
-        float x=(U1*V2)-(U2*V1);
-        float y=(U2*V0)-(U0*V2);
-        float z=(U0*V1)-(U1*V0);
-		normals[i*3]=x;
-		normals[i*3+1]=y;
-		normals[i*3+2]=z;
-    }
-
-
-} 
 
 
 
@@ -443,157 +561,36 @@ void move(float verts[],int size){
 } 
 
 
-////float identity_m[] = { 
-////	 1,0,0,//x = 1*x + 0*y + 0*z 
-////	 0,1,0,//y = 0*x + 1*1 + 0*z 
-////	 0,0,1 //z = 
-////};
+void add_shape(Shape *shape){
+	shapes[shape_count]=shape;
+	shape_count++;
 
+//   g_resources.vertex_buffer = make_buffer(
+//          GL_ARRAY_BUFFER,
+//          shape->verticies,
+//          shape->verts_size_of
+//   );
 
-float identity_m[] = { 
-	 1,0,0,0,//x = 1*x + 0*y + 0*z 
-	 0,1,0,0,//y = 0*x + 1*1 + 0*z 
-	 0,0,1,0,//z = 
-	 0,0,0,1//z = 
-};
+    //normals need to update as the objecgt uptates:todo
+////g_resources.normals_buffer = make_buffer(
+////	 GL_ARRAY_BUFFER,
+////	 shape->normals,
+////	 shape->normals_size_of
+//// );
 
-/*
- * Data used to seed our vertex array and element array buffers:
- */
+///  g_resources.element_buffer = make_buffer(
+///       GL_ELEMENT_ARRAY_BUFFER,
+///       shape->indicies,
+///       shape->indicies_size_of
+/// );
+}
 
-
- float g_vertex_buffer_data[] = { 
--1.0,-1.0,-1.0,1,
--1.0,-1.0, 1.0,1,
--1.0, 1.0, 1.0, 1,
-1.0, 1.0,-1.0, 1,
--1.0,-1.0,-1.0,1,
--1.0, 1.0,-1.0, 1,
-1.0,-1.0, 1.0,1,
--1.0,-1.0,-1.0,1,
-1.0,-1.0,-1.0,1,
-1.0, 1.0,-1.0,1,
-1.0,-1.0,-1.0,1,
--1.0,-1.0,-1.0,1,
--1.0,-1.0,-1.0,1,
--1.0, 1.0, 1.0,1,
--1.0, 1.0,-1.0,1,
-1.0,-1.0, 1.0,1,
--1.0,-1.0, 1.0,1,
--1.0,-1.0,-1.0,1,
--1.0, 1.0, 1.0,1,
--1.0,-1.0, 1.0,1,
-1.0,-1.0, 1.0,1,
-1.0, 1.0, 1.0,1,
-1.0,-1.0,-1.0,1,
-1.0, 1.0,-1.0,1,
-1.0,-1.0,-1.0,1,
-1.0, 1.0, 1.0,1,
-1.0,-1.0, 1.0,1,
-1.0, 1.0, 1.0,1,
-1.0, 1.0,-1.0,1,
--1.0, 1.0,-1.0,1,
-1.0, 1.0, 1.0,1,
--1.0, 1.0,-1.0,1,
--1.0, 1.0, 1.0,1,
-1.0, 1.0, 1.0,1,
--1.0, 1.0, 1.0,1,
-1.0,-1.0, 1.0,1
-};
-
-float g_normals_buffer_data[] = { 
-	-1.0,-1.0,-1.0,
-	-1.0,-1.0, 1.0,
-	-1.0, 1.0, 1.0,
-	1.0, 1.0,-1.0,
-	-1.0,-1.0,-1.0,
-	-1.0, 1.0,-1.0,
-	1.0,-1.0, 1.0,
-	-1.0,-1.0,-1.0,
-	1.0,-1.0,-1.0,
-	1.0, 1.0,-1.0,
-	1.0,-1.0,-1.0,
-	-1.0,-1.0,-1.0,
-	-1.0,-1.0,-1.0,
-	-1.0, 1.0, 1.0,
-	-1.0, 1.0,-1.0,
-	1.0,-1.0, 1.0,
-	-1.0,-1.0, 1.0,
-	-1.0,-1.0,-1.0,
-	-1.0, 1.0, 1.0,
-	-1.0,-1.0, 1.0,
-	1.0,-1.0, 1.0,
-	1.0, 1.0, 1.0,
-	1.0,-1.0,-1.0,
-	1.0, 1.0,-1.0,
-	1.0,-1.0,-1.0,
-	1.0, 1.0, 1.0,
-	1.0,-1.0, 1.0,
-	1.0, 1.0, 1.0,
-	1.0, 1.0,-1.0,
-	-1.0, 1.0,-1.0,
-	1.0, 1.0, 1.0,
-	-1.0, 1.0,-1.0,
-	-1.0, 1.0, 1.0,
-	1.0, 1.0, 1.0,
-	-1.0, 1.0, 1.0,
-	1.0,-1.0, 1.0
-};
-
-/// static const GLushort g_element_buffer_data[] = {
-///   0,  1,  2,      0,  2,  3,    // front
-///   4,  5,  6,      4,  6,  7,    // back
-///   8,  9,  10,     8,  10, 11,   // top
-///   12, 13, 14,     12, 14, 15,   // bottom
-///   16, 17, 18,     16, 18, 19,   // right
-///   20, 21, 22,     20, 22, 23    // left
-/// };
-static const GLushort g_element_buffer_data[] = {
-  0,  1,  2,      3,  4,  5,    // front
-  6,  7,  8,      9,  10, 11,    // back
-  12, 13, 14,     15, 16, 17,   // top
-  18, 19, 20,     21, 22, 23,   // bottom
-  24, 25, 26,     27, 28, 29,   // right
-  30, 31, 32,     33, 34, 35    // left
-};
 
 /*
  * Load and create all of our resources:
  */
 static int make_resources(void)
 {
-    g_resources.vertex_buffer = make_buffer(
-        GL_ARRAY_BUFFER,
-        g_vertex_buffer_data,
-        sizeof(g_vertex_buffer_data)
-    );
-
-	//just initialte with verticies
-	getNormals(&g_normals_buffer_data,g_vertex_buffer_data,sizeof(g_vertex_buffer_data));
-
-
-	
-	fprintf(stderr," x old  is at:%f\n",g_normals_buffer_data[0]);
-	fprintf(stderr," x old  is at:%f\n",g_normals_buffer_data[1]);
-	fprintf(stderr," x old  is at:%f\n",g_normals_buffer_data[2]);
-	fprintf(stderr," x old  is at:%f\n",g_normals_buffer_data[3]);
-	fprintf(stderr," x old  is at:%f\n",g_normals_buffer_data[5]);
-	fprintf(stderr," x old  is at:%f\n",g_normals_buffer_data[6]);
-	fprintf(stderr," x old  is at:%f\n",g_normals_buffer_data[7]);
-	fprintf(stderr," x old  is at:%f\n",g_normals_buffer_data[8]);
-	fprintf(stderr," x old  is at:%f\n",g_normals_buffer_data[9]);
-
-	g_resources.normals_buffer = make_buffer(
-        GL_ARRAY_BUFFER,
-        g_normals_buffer_data,
-        sizeof(g_normals_buffer_data)
-    );
-
-    g_resources.element_buffer = make_buffer(
-        GL_ELEMENT_ARRAY_BUFFER,
-        g_element_buffer_data,
-        sizeof(g_element_buffer_data)
-    );
 
     g_resources.textures[0] = make_texture("hello1.tga");
     g_resources.textures[1] = make_texture("hello2.tga");
@@ -628,7 +625,6 @@ static int make_resources(void)
     g_resources.attributes.position = glGetAttribLocation(g_resources.program, "position");
     g_resources.attributes.normal = glGetAttribLocation(g_resources.program, "normal");
 
-
     return 1;
 }
 
@@ -646,18 +642,15 @@ static void update_fade_factor(void)
 static void render(void)
 {
     
-	glFlush();//clear
-	glClearColor(1.0,1.0,1.0,1.0);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	
-
-    glUseProgram(g_resources.program);
-    glUniform1f(g_resources.uniforms.fade_factor, g_resources.fade_factor);
-
-    getViewMatrix(&g_resources.Vmatrix); //start at -10z
+   glFlush();//clear
+   glClearColor(1.0,1.0,1.0,1.0);
+   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 
+   glUseProgram(g_resources.program);
+   glUniform1f(g_resources.uniforms.fade_factor, g_resources.fade_factor);
 
+   getViewMatrix(&g_resources.Vmatrix); //start at -10z
    getModelMatrix(&g_resources.Mmatrix); 
 
    //y, axes rotation -- we rotate the model not the view
@@ -670,38 +663,11 @@ static void render(void)
    multiplyMatrices(&g_resources.Mmatrix,r_x_m,sizeof(g_resources.Mmatrix),sizeof(r_x_m));
 
 
+    glUniformMatrix4fv(g_resources.uniforms.Mmatrix, 1, GL_FALSE, &g_resources.Mmatrix);
+    glUniformMatrix4fv(g_resources.uniforms.Vmatrix, 1, GL_FALSE, &g_resources.Vmatrix); 
 
-////getRotateXMatrix(45,&r_matrix_x);
-
-	//projection matrix
-
-	 glUniformMatrix4fv(
-			  g_resources.uniforms.Mmatrix,
-			  1,
-			  GL_FALSE,
-			  &g_resources.Mmatrix
-	  );
-
-    //set Vmatrix
-    glUniformMatrix4fv(
-            g_resources.uniforms.Vmatrix,
-            1,
-            GL_FALSE,
-            &g_resources.Vmatrix
-    );
-
-   getProjectionMatrixTwo(&g_resources.Pmatrix, 40+(zoom*2), 1, .1, 3000); 
-
-   glUniformMatrix4fv(
-            g_resources.uniforms.Pmatrix,
-            1,
-            GL_FALSE,
-            &g_resources.Pmatrix
-    );
-
-  
-
-
+    getProjectionMatrix(&g_resources.Pmatrix, 40+(zoom*2), 1, .1, 3000); 
+    glUniformMatrix4fv( g_resources.uniforms.Pmatrix, 1, GL_FALSE, &g_resources.Pmatrix);
     
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, g_resources.textures[0]);
@@ -711,44 +677,40 @@ static void render(void)
     glBindTexture(GL_TEXTURE_2D, g_resources.textures[1]);
     glUniform1i(g_resources.uniforms.textures[1], 1);
 
-
-
-    glBindBuffer(GL_ARRAY_BUFFER, g_resources.vertex_buffer);
-    glVertexAttribPointer(
-        g_resources.attributes.position,  /* attribute */
-        4,                                /* size */
-        GL_FLOAT,                         /* type */
-        GL_FALSE,                         /* normalized? */
-        sizeof(float)*4,                /* stride */
-        (void*)0                          /* array buffer offset */
-    );
-    glEnableVertexAttribArray(g_resources.attributes.position);
-
-
-	//refresh the normals the light is stagnent elsewhere
+	//loop over and set buffer
+	int s=0;
+	for(s=0;s<shape_count;s++){
+	   g_resources.vertex_buffer = make_buffer(
+			  GL_ARRAY_BUFFER,
+			  shapes[s]->verticies,
+			  shapes[s]->verts_size_of
+	   );
+	  g_resources.element_buffer = make_buffer(
+		   GL_ELEMENT_ARRAY_BUFFER,
+		   shapes[s]->indicies,
+		   shapes[s]->indicies_size_of
+	  );
+		//bind positions
+		glBindBuffer(GL_ARRAY_BUFFER, g_resources.vertex_buffer);
+		glVertexAttribPointer(g_resources.attributes.position, 4, GL_FLOAT, GL_FALSE, sizeof(float)*4, (void*)0);
+		glEnableVertexAttribArray(g_resources.attributes.position);
 
 	//bind the normals buffer
-    glBindBuffer(GL_ARRAY_BUFFER, g_resources.normals_buffer);
-    glVertexAttribPointer(
-        g_resources.attributes.normal,  /* attribute */
-        3,                                /* size */
-        GL_FLOAT,                         /* type */
-        GL_FALSE,                        /* normalized? */
-        sizeof(float)*3,                /* stride */
-        (void*)0                          /* array buffer offset */
-    );
-    glEnableVertexAttribArray(g_resources.attributes.normal);
+	  //glBindBuffer(GL_ARRAY_BUFFER, g_resources.normals_buffer);
+	  //glVertexAttribPointer(g_resources.attributes.normal, 3,GL_FLOAT,GL_FALSE, sizeof(float)*3, (void*)0);
+	  //glEnableVertexAttribArray(g_resources.attributes.normal);
 
 
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, g_resources.element_buffer);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, g_resources.element_buffer);
+		
+		glDrawElements(
+			GL_TRIANGLES,  /* mode */
+			shapes[s]->verts_size_of, /* count */
+			GL_UNSIGNED_SHORT,  /* type */
+			(void*)0            /* element array buffer offset */
+		);
 
-    glDrawElements(
-        GL_TRIANGLES,  /* mode */
-        //GL_LINES,  /* mode */
-        sizeof(g_vertex_buffer_data)/sizeof(float), /* count */
-        GL_UNSIGNED_SHORT,  /* type */
-        (void*)0            /* element array buffer offset */
-    );
+	}
 
     glDisableVertexAttribArray(g_resources.attributes.position);
     glDisableVertexAttribArray(g_resources.attributes.normal);
@@ -796,20 +758,6 @@ void keyPressed (unsigned char key, int x, int y)
 int main(int argc, char** argv)
 {
 
-	//move(g_vertex_buffer_data,sizeof(g_vertex_buffer_data));
-//        multiplyMatrices(&g_vertex_buffer_data,identity_m,sizeof(g_vertex_buffer_data),sizeof(identity_m));
-    
-
-
-//fprintf(stderr, "%f,",g_vertex_buffer_data[0]); fprintf(stderr, "%f,",g_vertex_buffer_data[1]); fprintf(stderr, "%f\n",g_vertex_buffer_data[2]); fprintf(stderr, "%f\n",g_vertex_buffer_data[4]);
-
-
-
-//  float r_matrix_x[9];
-//  getRotateYMatrix(40,&r_matrix_x);
-//  multiplyMatrices(&g_vertex_buffer_data,r_matrix_x,sizeof(g_vertex_buffer_data),sizeof(r_matrix_x));
-
-
     glutInit(&argc, argv);
     glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE);
     glutInitWindowSize(1000, 1000);
@@ -822,9 +770,28 @@ int main(int argc, char** argv)
     glutMotionFunc(motion);
 	glutKeyboardFunc(keyPressed);
 
-
-
     glewInit();
+ 
+    //add shapes after glew init
+    Cube cube1;
+    new_cube(&cube1);
+
+	Sphere spere1;
+
+    new_sphere(&spere1,1000,0,0,0);
+    add_shape(&spere1.s);
+
+    Sphere spere2;
+    new_sphere(&spere2,1,1,1,0);
+    add_shape(&spere2.s);
+
+    Sphere spere3;
+    new_sphere(&spere3,1,0,1002,0);
+    add_shape(&spere3.s);
+
+
+   // add_shape(&cube1.s);
+
     if (!GLEW_VERSION_2_0) {
         fprintf(stderr, "OpenGL 2.0 not available\n");
         return 1;
