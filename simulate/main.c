@@ -1,4 +1,9 @@
 //τ=Kt(I−I0) //torche= Kt is the torque contatn and I is current Io is when current is 0
+#ifdef __APPLE__
+#  include <GLUT/glut.h>
+#else
+#  include <GL/glut.h>
+#endif
 #include <stdio.h>
 #include <math.h>
 #include <float.h>
@@ -6,7 +11,11 @@
 
 #include <time.h>
 #include <unistd.h>
+#include "ball/hello-gl.h"
+#include "main.h"
+#include "ball/util.h"
 #define MS_TO_NS(x) (1000000*(x))
+
 
 //Constants
 double const GRAVITY_CONSTANT = 6.67408E-11;
@@ -35,6 +44,11 @@ struct Baseball
     struct Solid s; 
 };
 
+struct Quadcopter
+{  
+    struct Solid s; 
+};
+
 //function definitions
 double g_force(double mass1,double mass2,double dist);
 struct Vec v_g_force(struct Solid s1, struct Solid s2);
@@ -42,7 +56,6 @@ double v_dot(struct Vec v1,struct Vec v2);
 struct Vec v_prop(struct Vec v1,struct Vec v2);
 double v_distance(struct Vec v1,struct Vec v2);
 double v_distance_one(struct Vec v);
-void sim(struct Baseball *my_baseball, double hz);
 struct Vec v_norm(struct Vec v);
 struct Vec v_sub_abs(struct Vec a,struct Vec b);
 struct Vec v_mult_s(struct Vec v,double m);
@@ -202,70 +215,113 @@ struct Vec v_norm(struct Vec v){
 	return nv;
 }
 
+struct Baseball my_baseball;
 
-void sim(struct Baseball *my_baseball, double hz){
+void setup_sim(){
+	my_baseball.s.center_of_mass.x=0;
+	my_baseball.s.center_of_mass.y=EARTH_RADIUS+100;
+	my_baseball.s.center_of_mass.z=0;
+	my_baseball.s.mass=1;//kg
+	my_baseball.s.velocity.x=0;//kg
+	my_baseball.s.velocity.y=0;//kg
+	my_baseball.s.velocity.z=0;//kg
+
+    
+}
+
+void sim(){
+	double hz=50;
     double seconds=1/hz;
     struct Earth e=EARTH();
+
    // struct Vec d=v_sub(my_baseball->s->center_of_mass,e.s.center_of_mass);
-    struct Vec f=v_g_force(e.s,my_baseball->s);
 
-    my_baseball->s.velocity=v_add( 
-         my_baseball->s.velocity, 
-         v_divide_s(v_mult_s(f,seconds),my_baseball->s.mass)
+    struct Vec f=v_g_force(e.s,my_baseball.s);
+
+    my_baseball.s.velocity=v_add( 
+           my_baseball.s.velocity, 
+           v_divide_s(v_mult_s(f,seconds),my_baseball.s.mass)
     );
 
-    my_baseball->s.center_of_mass=v_add( 
-      my_baseball->s.center_of_mass, 
-      v_mult_s(my_baseball->s.velocity,seconds)
+    my_baseball.s.center_of_mass=v_add( 
+      my_baseball.s.center_of_mass, 
+      v_mult_s(my_baseball.s.velocity,seconds)
     );
+
+    //hack for now to detect collision
+    if(my_baseball.s.center_of_mass.y < EARTH_RADIUS){
+        //in perfectly ellastic we simply flip velocity...? i think
+        my_baseball.s.velocity.y=my_baseball.s.velocity.y*(.90) * -1 ;//bound coeficient
+    }
+
+
+    //printf("%lf",(float) my_baseball.s.center_of_mass.y); printf("\n");
+
+    update_sphere(3,
+        (float)	my_baseball.s.center_of_mass.x,
+        (float) my_baseball.s.center_of_mass.y,
+        (float) my_baseball.s.center_of_mass.z
+    );
+
+ //   update_sphere(1,0,EARTH_RADIUS+20,0);
     
 
    // (f*seconds)/my_baseball.mass;
    // my_baseball->velocity+=(f*seconds)/my_baseball->mass;
 
-    printf("%lf",my_baseball->s.velocity.y); printf("\n");
-    //printf("%lf",my_baseball->s.center_of_mass.x); printf("\n");
-    printf("%lf",my_baseball->s.center_of_mass.y); printf("\n");
+    //printf("%lf",my_baseball.s.velocity.y); printf("\n");
+    //printf("%lf",my_baseball.s.center_of_mass.y); printf("\n");
     //printf("%lf",my_baseball->s.center_of_mass.z); printf("\n");
 //  //printf("%lf",my_baseball->velocity); printf("\n");
+
 }
 
-int main(){
 
-struct timespec last, now;
-clock_gettime(CLOCK_MONOTONIC, &last);
-double elapsed = 0;
-double hz=100;// run simulation 100 times per second
 
-struct Baseball my_baseball;
-my_baseball.s.center_of_mass.x=0;
-my_baseball.s.center_of_mass.y=EARTH_RADIUS+20;
-my_baseball.s.center_of_mass.z=0;
-my_baseball.s.mass=1;//kg
-my_baseball.s.velocity.x=0;//kg
-my_baseball.s.velocity.y=0;//kg
-my_baseball.s.velocity.z=0;//kg
 
-while (1) {
-	last = now;
 
-	usleep(100); // Sleep for 1/1000 second
+int main(int argc, char** argv){
+setup_sim();
+init_glut(argc, argv);
 
-	clock_gettime(CLOCK_MONOTONIC, &now);
+return 0;
 
-    if(!last.tv_nsec){
-        continue;
-    }
+////struct timespec last, now;
+////clock_gettime(CLOCK_MONOTONIC, &last);
+////double elapsed = 0;
+////double hz=100;// run simulation 100 times per second
 
-	elapsed += (1000000000 * (double)(now.tv_sec  - last.tv_sec)) +
-			   (double)(now.tv_nsec - last.tv_nsec);
+////struct Baseball my_baseball;
+////my_baseball.s.center_of_mass.x=0;
+////my_baseball.s.center_of_mass.y=EARTH_RADIUS+20;
+////my_baseball.s.center_of_mass.z=0;
+////my_baseball.s.mass=1;//kg
+////my_baseball.s.velocity.x=0;//kg
+////my_baseball.s.velocity.y=0;//kg
+////my_baseball.s.velocity.z=0;//kg
 
-	while (elapsed >= MS_TO_NS(1000/hz)) {
-        elapsed -= MS_TO_NS(1000/hz);
-        sim(&my_baseball,hz);
-	}
-}
+////	while (1) {
+////		last = now;
 
+////		usleep(100); // Sleep for 1/1000 second
+
+////		clock_gettime(CLOCK_MONOTONIC, &now);
+
+////		if(!last.tv_nsec){
+////			continue;
+////		}
+
+////		elapsed += (1000000000 * (double)(now.tv_sec  - last.tv_sec)) +
+////				   (double)(now.tv_nsec - last.tv_nsec);
+
+////		while (elapsed >= MS_TO_NS(1000/hz)) {
+////			elapsed -= MS_TO_NS(1000/hz);
+////			sim(&my_baseball,hz);
+////			//render new glut
+////			 //render();
+
+////		}
+////	}
 
 }
 

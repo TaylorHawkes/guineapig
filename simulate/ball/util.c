@@ -7,6 +7,7 @@
  * Boring, non-OpenGL-related utility functions
  */
 
+//ok
 void *file_contents(const char *filename, GLint *length)
 {
     FILE *f = fopen(filename, "r");

@@ -8,7 +8,13 @@
 #include <math.h>
 #include <stdio.h>
 #include "util.h"
+#include "hello-gl.h"
+#include <unistd.h>
+#include <time.h>
 
+#include "../main.h" 
+
+#define MS_TO_NS(x) (1000000*(x))
 
 typedef struct {
   float *verticies;
@@ -24,7 +30,6 @@ typedef struct {
 //  {
 //    return s->build_verticies(s);
 //  }
-
 typedef struct {
   Shape s;
 } Cube;
@@ -33,7 +38,7 @@ typedef struct {
   Shape s;
 } Sphere;
 
-Shape *shapes[20];
+Shape shapes[20];
 int shape_count=0;
 
 
@@ -87,7 +92,7 @@ void new_sphere(Sphere *sphere,float radius,float start_x, float start_y, float 
 	int verts_size_of=(latitudeBands+1) * (longitudeBands+1) * 4 * sizeof(float);
 
 	verticies=(float *) malloc(verts_size_of);
-	fprintf(stderr,"v index: %i\n",verts_size_of);
+	//fprintf(stderr,"v index: %i\n",verts_size_of);
 	int latNumber=0;
     int v_index=0;
      for (latNumber = 0; latNumber <= latitudeBands; latNumber++) {                                 
@@ -109,7 +114,7 @@ void new_sphere(Sphere *sphere,float radius,float start_x, float start_y, float 
        } 
      }
 
-	fprintf(stderr,"v index: %i\n",v_index);
+//	fprintf(stderr,"v index: %i\n",v_index);
 
     short *indexData;
 	int index_size_of=(latitudeBands+1) * (longitudeBands+1) * 6 * sizeof(short);
@@ -209,7 +214,7 @@ void new_cube(Cube *cube)
 
    int size_of_normals=sizeof(v) * 3/4 ;
 
-   fprintf(stderr, "Normals sizei s %i", size_of_normals);
+   //fprintf(stderr, "Normals sizei s %i", size_of_normals);
    cube->s.normals=malloc(size_of_normals);
    cube->s.normals_size_of=size_of_normals;
 
@@ -304,7 +309,7 @@ static void show_info_log( GLuint object, PFNGLGETSHADERIVPROC glGet__iv, PFNGLG
     glGet__iv(object, GL_INFO_LOG_LENGTH, &log_length);
     log = malloc(log_length);
     glGet__InfoLog(object, log_length, NULL, log);
-    fprintf(stderr, "%s", log);
+   // fprintf(stderr, "%s", log);
     free(log);
 }
 
@@ -422,8 +427,8 @@ void getViewMatrix(float *r_matrix){
     r_matrix[11]=0;
 
 	r_matrix[12]=0;//x, 
-	r_matrix[13]=-1000;//y,
-	r_matrix[14]=-50;//z
+	r_matrix[13]=-6371000;//y,
+	r_matrix[14]=-500;//z
 	r_matrix[15]=1;
 }
 
@@ -561,8 +566,13 @@ void move(float verts[],int size){
 } 
 
 
+void replace_shape(Shape *shape){
+	shapes[1]=*shape;
+	//shape_count++;
+}
+
 void add_shape(Shape *shape){
-	shapes[shape_count]=shape;
+	shapes[shape_count]=*shape;
 	shape_count++;
 
 //   g_resources.vertex_buffer = make_buffer(
@@ -592,22 +602,23 @@ void add_shape(Shape *shape){
 static int make_resources(void)
 {
 
-    g_resources.textures[0] = make_texture("hello1.tga");
-    g_resources.textures[1] = make_texture("hello2.tga");
+    //g_resources.textures[0] = make_texture("hello1.tga");
+    //g_resources.textures[1] = make_texture("hello2.tga");
 
-    if (g_resources.textures[0] == 0 || g_resources.textures[1] == 0)
-        return 0;
+//  if (g_resources.textures[0] == 0 || g_resources.textures[1] == 0) {
+//      return 0;
+//  }
 
     g_resources.vertex_shader = make_shader(
         GL_VERTEX_SHADER,
-        "hello-gl.v.glsl"
+        "/Users/taylorhawkes/Desktop/guinea_pig.h/simulate/ball/hello-gl.v.glsl"
     );
     if (g_resources.vertex_shader == 0)
         return 0;
 
     g_resources.fragment_shader = make_shader(
         GL_FRAGMENT_SHADER,
-        "hello-gl.f.glsl"
+        "/Users/taylorhawkes/Desktop/guinea_pig.h/simulate/ball/hello-gl.f.glsl"
     );
     if (g_resources.fragment_shader == 0)
         return 0;
@@ -620,26 +631,54 @@ static int make_resources(void)
     g_resources.uniforms.Vmatrix = glGetUniformLocation(g_resources.program, "Vmatrix");
 	g_resources.uniforms.Pmatrix = glGetUniformLocation(g_resources.program, "Pmatrix");
 	g_resources.uniforms.Mmatrix = glGetUniformLocation(g_resources.program, "Mmatrix");
-    g_resources.uniforms.textures[0] = glGetUniformLocation(g_resources.program, "textures[0]");
-    g_resources.uniforms.textures[1] = glGetUniformLocation(g_resources.program, "textures[1]");
+    //g_resources.uniforms.textures[0] = glGetUniformLocation(g_resources.program, "textures[0]");
+    //g_resources.uniforms.textures[1] = glGetUniformLocation(g_resources.program, "textures[1]");
     g_resources.attributes.position = glGetAttribLocation(g_resources.program, "position");
     g_resources.attributes.normal = glGetAttribLocation(g_resources.program, "normal");
 
     return 1;
 }
 
+
+struct timespec last, now;
+double elapsed = 0;
+double hz=50;// run simulation 100 times per second
+
+
 /*
  * GLUT callbacks:
  */
 static void update_fade_factor(void)
 {
-    int milliseconds = glutGet(GLUT_ELAPSED_TIME);
-    g_resources.fade_factor = sinf((float)milliseconds * 0.001f) * 0.5f + 0.5f;
-    glutPostRedisplay();
+	last = now;
+
+	usleep(100); // Sleep for 1/1000 second
+
+	clock_gettime(CLOCK_MONOTONIC, &now);
+
+	if(!last.tv_nsec){
+        return;
+    }
+
+	elapsed += (1000000000 * (double)(now.tv_sec  - last.tv_sec)) +
+			   (double)(now.tv_nsec - last.tv_nsec);
+
+
+	while (elapsed >= MS_TO_NS(1000/hz)) {
+        elapsed -= MS_TO_NS(1000/hz);
+        sim();
+		glutPostRedisplay();
+		//render new glut
+		 //render();
+	}
+
 }
 
+
+
+
 //this is the function getting called a bunch
-static void render(void)
+void render()
 {
     
    glFlush();//clear
@@ -666,30 +705,31 @@ static void render(void)
     glUniformMatrix4fv(g_resources.uniforms.Mmatrix, 1, GL_FALSE, &g_resources.Mmatrix);
     glUniformMatrix4fv(g_resources.uniforms.Vmatrix, 1, GL_FALSE, &g_resources.Vmatrix); 
 
-    getProjectionMatrix(&g_resources.Pmatrix, 40+(zoom*2), 1, .1, 3000); 
+    getProjectionMatrix(&g_resources.Pmatrix, 40+(zoom*2), 1, .1, 10000); 
     glUniformMatrix4fv( g_resources.uniforms.Pmatrix, 1, GL_FALSE, &g_resources.Pmatrix);
     
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, g_resources.textures[0]);
-    glUniform1i(g_resources.uniforms.textures[0], 0);
+//  glActiveTexture(GL_TEXTURE0);
+//  glBindTexture(GL_TEXTURE_2D, g_resources.textures[0]);
+//  glUniform1i(g_resources.uniforms.textures[0], 0);
 
-    glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, g_resources.textures[1]);
-    glUniform1i(g_resources.uniforms.textures[1], 1);
+/// glActiveTexture(GL_TEXTURE1);
+/// glBindTexture(GL_TEXTURE_2D, g_resources.textures[1]);
+/// glUniform1i(g_resources.uniforms.textures[1], 1);
 
 	//loop over and set buffer
 	int s=0;
 	for(s=0;s<shape_count;s++){
 	   g_resources.vertex_buffer = make_buffer(
 			  GL_ARRAY_BUFFER,
-			  shapes[s]->verticies,
-			  shapes[s]->verts_size_of
+			  shapes[s].verticies,
+			  shapes[s].verts_size_of
 	   );
 	  g_resources.element_buffer = make_buffer(
 		   GL_ELEMENT_ARRAY_BUFFER,
-		   shapes[s]->indicies,
-		   shapes[s]->indicies_size_of
+		   shapes[s].indicies,
+		   shapes[s].indicies_size_of
 	  );
+
 		//bind positions
 		glBindBuffer(GL_ARRAY_BUFFER, g_resources.vertex_buffer);
 		glVertexAttribPointer(g_resources.attributes.position, 4, GL_FLOAT, GL_FALSE, sizeof(float)*4, (void*)0);
@@ -705,7 +745,7 @@ static void render(void)
 		
 		glDrawElements(
 			GL_TRIANGLES,  /* mode */
-			shapes[s]->verts_size_of, /* count */
+			shapes[s].verts_size_of, /* count */
 			GL_UNSIGNED_SHORT,  /* type */
 			(void*)0            /* element array buffer offset */
 		);
@@ -751,58 +791,121 @@ void keyPressed (unsigned char key, int x, int y)
     }
 	glutPostRedisplay();
 }
+void say_high(){
+	printf("HELLO DOG");
+}
+
+void init_glut(int argc, char** argv){
+     glutInit(&argc, argv);
+     glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE);
+     glutInitWindowSize(1000, 1000);
+     glutCreateWindow("Hello World");
+     glutIdleFunc(&update_fade_factor);
+     glutDisplayFunc(&render);
+     //used to detect stuff
+     glutMouseFunc(mouse);
+     glutMotionFunc(motion);
+     glutKeyboardFunc(keyPressed);
+
+     glewInit();
+  
+     //add shapes after glew init
+  ///Cube cube1;
+  ///new_cube(&cube1);
+     
+	//we will init w/ the world
+	 Sphere spere1;
+     new_sphere(&spere1,6371000,0,0,0);
+     add_shape(&spere1.s);
+
+ 	 Sphere spere2;
+  	 new_sphere(&spere2,1,1,6371030,0);
+  	 add_shape(&spere2.s);
+
+ /// Sphere spere3;
+ /// new_sphere(&spere3,1,0,1002,0);
+ /// add_shape(&spere3.s);
+
+    // add_shape(&cube1.s);
+
+     if (!GLEW_VERSION_2_0) {
+         fprintf(stderr, "OpenGL 2.0 not available\n");
+         return ;
+     }
+
+     if (!make_resources()) {
+         fprintf(stderr, "Failed to load resources\n");
+         return ;
+     }
+
+	 clock_gettime(CLOCK_MONOTONIC, &last);
+	//glutMainLoopEvent();
+     glutMainLoop();
+}
+
+
+
+void update_sphere(float radius,float start_x, float start_y, float start_z){
+
+      printf("y:%lf",(float) start_y); printf("\n");
+      
+      Sphere sphere3;
+      new_sphere(&sphere3,radius,start_x,start_y,0);
+      replace_shape(&sphere3.s);
+}
+
+
 
 /*
  * Entry point
  */
-int main(int argc, char** argv)
-{
+//  int main(int argc, char** argv)
+//  {
 
-    glutInit(&argc, argv);
-    glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE);
-    glutInitWindowSize(1000, 1000);
-    glutCreateWindow("Hello World");
-    //glutIdleFunc(&update_fade_factor);
-    glutDisplayFunc(&render);
+//      glutInit(&argc, argv);
+//      glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE);
+//      glutInitWindowSize(1000, 1000);
+//      glutCreateWindow("Hello World");
+//      //glutIdleFunc(&update_fade_factor);
+//      glutDisplayFunc(&render);
 
-    //used to detect stuff
-    glutMouseFunc(mouse);
-    glutMotionFunc(motion);
-	glutKeyboardFunc(keyPressed);
+//      //used to detect stuff
+//      glutMouseFunc(mouse);
+//      glutMotionFunc(motion);
+//      glutKeyboardFunc(keyPressed);
 
-    glewInit();
- 
-    //add shapes after glew init
-    Cube cube1;
-    new_cube(&cube1);
+//      glewInit();
+//   
+//      //add shapes after glew init
+//      Cube cube1;
+//      new_cube(&cube1);
 
-	Sphere spere1;
+//      Sphere spere1;
 
-    new_sphere(&spere1,1000,0,0,0);
-    add_shape(&spere1.s);
+//      new_sphere(&spere1,1000,0,0,0);
+//      add_shape(&spere1.s);
 
-    Sphere spere2;
-    new_sphere(&spere2,1,1,1,0);
-    add_shape(&spere2.s);
+//      Sphere spere2;
+//      new_sphere(&spere2,1,1,1,0);
+//      add_shape(&spere2.s);
 
-    Sphere spere3;
-    new_sphere(&spere3,1,0,1002,0);
-    add_shape(&spere3.s);
+//      Sphere spere3;
+//      new_sphere(&spere3,1,0,1002,0);
+//      add_shape(&spere3.s);
 
+//     // add_shape(&cube1.s);
 
-   // add_shape(&cube1.s);
+//      if (!GLEW_VERSION_2_0) {
+//          fprintf(stderr, "OpenGL 2.0 not available\n");
+//          return 1;
+//      }
 
-    if (!GLEW_VERSION_2_0) {
-        fprintf(stderr, "OpenGL 2.0 not available\n");
-        return 1;
-    }
+//      if (!make_resources()) {
+//          fprintf(stderr, "Failed to load resources\n");
+//          return 1;
+//      }
 
-    if (!make_resources()) {
-        fprintf(stderr, "Failed to load resources\n");
-        return 1;
-    }
-
-    glutMainLoop();
-    return 0;
-}
+//      glutMainLoop();
+//      return 0;
+//  }
 
