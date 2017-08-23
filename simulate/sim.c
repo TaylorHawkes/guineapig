@@ -36,9 +36,9 @@ static struct {
     } attributes;
 
     float fade_factor;
-    GLdouble Vmatrix[16];
-    GLdouble Pmatrix[16];
-    GLdouble Mmatrix[16];
+    GLfloat Vmatrix[16];
+    GLfloat Pmatrix[16];
+    GLfloat Mmatrix[16];
 
 } g_resources;
 
@@ -48,13 +48,10 @@ double const GRAVITY_CONSTANT = 6.67408E-11;
 double const EARTH_MASS = 5.972E+24;//kg
 double const EARTH_RADIUS = 6371000;//in meters
 
-typedef struct {
-    double x,y,z;
-} Vec;
 
 typedef struct {
-    Vec point;
-    Vec force;
+    Vec point;//point on object force is applied
+    Vec force;//direction and magnitude of force neutons
 } Force;
 
 
@@ -62,15 +59,20 @@ typedef struct {
   Vec center_of_mass;
   Vec ineritia;
   Vec velocity;
- double mass;
+ float mass;
 
- double *forces;
- double *verticies;
- double *normals;
- double *indicies;
+ Force forces[10];
+ int forces_count;
+
+ float *verticies;
+ float *normals;
+ float *indicies;
  int verticies_size; 
  int indicies_size;
  int normals_size;
+
+ GLfloat model_matrix[16];
+
 } Solid ;
 
 typedef struct {
@@ -80,11 +82,12 @@ typedef struct {
 //global variables
 Solid solids[2];
 int solid_count=0;
-
-
+struct timespec last, now;
+double elapsed = 0;
+double hz=100;//times per second
 
 void new_cube(Cube *cube){
-    double v[]={
+    float v[]={
         -1.0,-1.0,-1.0,1,
         -1.0,-1.0, 1.0,1,
         -1.0, 1.0, 1.0, 1,
@@ -129,7 +132,7 @@ void new_cube(Cube *cube){
     memcpy(cube->s.verticies, v, sizeof(v));
 
     //populate the indicies
-    int indicies_size=sizeof(short) * (sizeof(v)/sizeof(double)) / 4;
+    int indicies_size=sizeof(short) * (sizeof(v)/sizeof(float)) / 4;
     cube->s.indicies=malloc(indicies_size);
     cube->s.indicies_size=indicies_size;
     short t_indicies[indicies_size];
@@ -147,6 +150,34 @@ void new_cube(Cube *cube){
 // float t_normals[size_of_normals];
 // getNormals(&t_normals,v,sizeof(v));
 // memcpy(cube->s.normals, t_normals, size_of_normals);
+    
+    //setup default model matrix
+
+     float m_matrix[16];
+// getNormals(&t_normals,v,sizeof(v));
+   // getModelMatrix(m_matrix);
+
+	cube->s.model_matrix[0]=1;
+	cube->s.model_matrix[1]=0;
+    cube->s.model_matrix[2]=0;
+    cube->s.model_matrix[3]=0;//x
+
+	cube->s.model_matrix[4]=0;
+	cube->s.model_matrix[5]=1;
+	cube->s.model_matrix[6]=0;
+	cube->s.model_matrix[7]=0; //y
+
+	cube->s.model_matrix[8]=0;
+    cube->s.model_matrix[9]=0;
+    cube->s.model_matrix[10]=1;
+    cube->s.model_matrix[11]=0;//z???
+
+	cube->s.model_matrix[12]=0;//x, or w/out transpose
+	cube->s.model_matrix[13]=0;//y,
+	cube->s.model_matrix[14]=0;//z
+	cube->s.model_matrix[15]=1;
+
+
 }
 
 //todo:make htis work
@@ -171,19 +202,20 @@ void render()
    glUniform1f(g_resources.uniforms.fade_factor, g_resources.fade_factor);
 
    getViewMatrix(&g_resources.Vmatrix); //start at -10z
+
    getModelMatrix(&g_resources.Mmatrix); 
 
    //y, axes rotation -- we rotate the model not the view
-   double r_y_m[16];
+   float r_y_m[16];
    getRotateYMatrix(0,&r_y_m); 
    multiplyMatrices(&g_resources.Mmatrix,r_y_m,sizeof(g_resources.Mmatrix),sizeof(r_y_m));
 
-   double r_x_m[16];
+   float r_x_m[16];
    getRotateXMatrix(0,&r_x_m); 
    multiplyMatrices(&g_resources.Mmatrix,r_x_m,sizeof(g_resources.Mmatrix),sizeof(r_x_m));
 
 
-    glUniformMatrix4fv(g_resources.uniforms.Mmatrix, 1, GL_FALSE, &g_resources.Mmatrix);
+
     glUniformMatrix4fv(g_resources.uniforms.Vmatrix, 1, GL_FALSE, &g_resources.Vmatrix); 
 
     getProjectionMatrix(&g_resources.Pmatrix, 40+(zoom*2), 1, .1, 10000); 
@@ -191,6 +223,11 @@ void render()
 
 	int s=0;
     for(s=0;s<solid_count;s++){
+       glUniformMatrix4fv(g_resources.uniforms.Mmatrix, 1, GL_FALSE, &solids[s].model_matrix);
+
+       fprintf(stderr,"x is :%f\n",solids[s].model_matrix[12]);
+
+
 	   g_resources.vertex_buffer = make_buffer(
 			  GL_ARRAY_BUFFER,
 			  solids[s].verticies,
@@ -204,7 +241,7 @@ void render()
 
 		//bind positions
 		glBindBuffer(GL_ARRAY_BUFFER, g_resources.vertex_buffer);
-		glVertexAttribPointer(g_resources.attributes.position, 4, GL_FLOAT, GL_FALSE, sizeof(double)*4, (void*)0);
+		glVertexAttribPointer(g_resources.attributes.position, 4, GL_FLOAT, GL_FALSE, sizeof(float)*4, (void*)0);
 		glEnableVertexAttribArray(g_resources.attributes.position);
 
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, g_resources.element_buffer);
@@ -223,56 +260,19 @@ void render()
     glutSwapBuffers();
 }
 
-int main(int argc, char** argv){
-     glutInit(&argc, argv);
-     glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE);
-     glutInitWindowSize(1000, 1000);
-     glutCreateWindow("Hello World");
-     //glutIdleFunc(&update_fade_factor);
-
-     
-     glutDisplayFunc(&render);
-     //used to detect stuff
-     //glutMouseFunc(mouse);
-     //glutMotionFunc(motion);
-     //glutKeyboardFunc(keyPressed);
-     glewInit();
-
-
-     Cube drone;
-     new_cube(&drone);
-     solids[0]=drone.s;
-     solid_count++;
-  
-
-     if (!GLEW_VERSION_2_0) {
-         fprintf(stderr, "OpenGL 2.0 not available\n");
-         return -1;
-     }
-
-     if (!make_resources()) {
-         fprintf(stderr, "Failed to load resources\n");
-         return -1;
-     }
-
-	 //clock_gettime(CLOCK_MONOTONIC, &last);
-     glutMainLoop();
-
-    return 0;
-}
 
 //This will onlly work with (x,4) * (4*4) matrix
-void multiplyMatrices(double *verticies, double translation[],int verticies_size,int translation_size){
+void multiplyMatrices(float *verticies, float translation[],int verticies_size,int translation_size){
 
-    double result[verticies_size];
-	int verticies_length=(verticies_size/sizeof(double)/4);//rows of m1;
+    float result[verticies_size];
+	int verticies_length=(verticies_size/sizeof(float)/4);//rows of m1;
     int i=0;
 
     for (i = 0; i < verticies_length; i++) { 
-        double x=verticies[(i*4)+0];
-        double y=verticies[(i*4)+1];
-        double z=verticies[(i*4)+2];
-        double w=verticies[(i*4)+3];
+        float x=verticies[(i*4)+0];
+        float y=verticies[(i*4)+1];
+        float z=verticies[(i*4)+2];
+        float w=verticies[(i*4)+3];
 
         result[(i*4)+0]=(x*translation[0])+(y*translation[1])+(z*translation[2]) + (w*translation[3]);
         result[(i*4)+1]=(x*translation[4])+(y*translation[5])+(z*translation[6]) + (w*translation[7]) ;
@@ -282,12 +282,12 @@ void multiplyMatrices(double *verticies, double translation[],int verticies_size
    
     int t=0;
 	//there must be a better way to do this
-    for (t = 0; t <= (sizeof(result)/sizeof(double)); t++) {
+    for (t = 0; t <= (sizeof(result)/sizeof(float)); t++) {
 		verticies[t]=result[t];
 	}
 }
 
-void getRotateYMatrix(double angle,double *r_matrix){
+void getRotateYMatrix(float angle,float *r_matrix){
     //a is radiansl
     float a=angle * (M_PI /180);
 
@@ -314,7 +314,7 @@ void getRotateYMatrix(double angle,double *r_matrix){
 }
 
 
-void getRotateXMatrix(double angle,double *r_matrix){
+void getRotateXMatrix(float angle,float *r_matrix){
     float a=angle * (M_PI /180);
 	r_matrix[0]=1;
 	r_matrix[1]=0;
@@ -338,7 +338,7 @@ void getRotateXMatrix(double angle,double *r_matrix){
 }
 
 
-void getViewMatrix(double *r_matrix){
+void getViewMatrix(float *r_matrix){
 	r_matrix[0]=1;
 	r_matrix[1]=0;
     r_matrix[2]=0;
@@ -355,12 +355,12 @@ void getViewMatrix(double *r_matrix){
     r_matrix[11]=0;
 
 	r_matrix[12]=0;//x, 
-	r_matrix[13]=-6371000;//y,
-	r_matrix[14]=-500;//z
+	r_matrix[13]=0;//y,
+	r_matrix[14]=-5;//z
 	r_matrix[15]=1;
 }
 
-void getModelMatrix( double *r_matrix){
+void getModelMatrix( float *r_matrix){
 	r_matrix[0]=1;
 	r_matrix[1]=0;
     r_matrix[2]=0;
@@ -382,10 +382,10 @@ void getModelMatrix( double *r_matrix){
 	r_matrix[15]=1;
 }
 
-void getProjectionMatrix( double *r_matrix,double angleOfView,double imageAspectRatio, double zMin, double zMax)
+void getProjectionMatrix( float *r_matrix,float angleOfView,float imageAspectRatio, float zMin, float zMax)
 {
 
-	double ang = tan((angleOfView*.5)*M_PI/180);//angle*.5                                                    
+	float ang = tan((angleOfView*.5)*M_PI/180);//angle*.5                                                    
 
     r_matrix[0] = 0.5/ang; 
     r_matrix[1] = 0; 
@@ -498,6 +498,142 @@ static GLuint make_program(GLuint vertex_shader, GLuint fragment_shader)
         return 0;
     }
     return program;
+}
+
+
+float v_distance( Vec v1, Vec v2){
+    return sqrt(
+        ((v2.x-v1.x) * (v2.x-v1.x))+ 
+        ((v2.y-v1.y) * (v2.y-v1.y))+
+        ((v2.z-v1.z) * (v2.z-v1.z))
+      );
+}
+
+void sim(void){
+
+  float seconds=1/hz;
+ //    fprintf(stderr, "Sim\n");
+  int i;
+  for(i=0;i<solid_count;i++){
+      int t;
+      for(t=0;t<solids[i].forces_count;t++){
+
+        //velocity = force/mass * time 
+    Vec accel= v_divide_s(solids[i].forces[t].force, solids[i].mass );
+     Vec velocity_new=v_mult_s(accel, seconds);
+     solids[i].velocity=v_add(velocity_new,solids[i].velocity);
+      
+      //then update the model matrix
+
+  solids[i].model_matrix[12]+= (GLfloat) seconds * solids[i].velocity.x;
+  solids[i].model_matrix[13]+= (GLfloat) seconds * solids[i].velocity.y;
+  solids[i].model_matrix[14]+= (GLfloat) seconds * solids[i].velocity.z;
+      
+      }
+
+      //update velocity
+      //update position
+  }
+}
+
+ Vec v_mult_s( Vec v,float m){
+     Vec vf;
+    vf.x=v.x*m;
+    vf.y=v.y*m;
+    vf.z=v.z*m;
+    return vf;
+}
+//vector multtiply by scalar
+ Vec v_divide_s( Vec v,float m){
+    Vec vf;
+    vf.x=v.x/m;
+    vf.y=v.y/m;
+    vf.z=v.z/m;
+    return vf;
+}
+
+Vec v_add(Vec a, Vec b){
+         Vec v;
+        v.x=a.x+b.x;
+        v.y=a.y+b.y;
+        v.z=a.z+b.z;
+        return v;
+}
+
+
+void simulate_timer(void){
+	last = now;
+	usleep(100); // Sleep for 1/1000 second
+	clock_gettime(CLOCK_MONOTONIC, &now);
+
+	if(!last.tv_nsec){
+        return;
+    }
+
+	elapsed += (1000000000 * (double)(now.tv_sec  - last.tv_sec)) +
+			   (double)(now.tv_nsec - last.tv_nsec);
+
+	while (elapsed >= MS_TO_NS(1000/hz)) {
+        elapsed -= MS_TO_NS(1000/hz);
+        sim();
+		glutPostRedisplay();
+		//render new glut
+		 //render();
+	}
+}
+int main(int argc, char** argv){
+
+	 clock_gettime(CLOCK_MONOTONIC, &now);
+
+     glutInit(&argc, argv);
+     glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE);
+     glutInitWindowSize(1000, 1000);
+     glutCreateWindow("Hello World");
+     glutIdleFunc(&simulate_timer);
+
+     
+     glutDisplayFunc(&render);
+     //used to detect stuff
+     //glutMouseFunc(mouse);
+     //glutMotionFunc(motion);
+     //glutKeyboardFunc(keyPressed);
+     glewInit();
+
+     Cube drone;
+     new_cube(&drone);
+     drone.s.mass=1;
+
+     Force fr_force;//apply force to front right
+     fr_force.point.x=-1;
+     fr_force.point.y=-1;
+     fr_force.point.z=1;
+
+     fr_force.force.x=0;
+     fr_force.force.y=1;//neuton
+     fr_force.force.z=0;
+
+     drone.s.forces[0]=fr_force;
+     drone.s.forces_count=1;
+
+
+     solids[0]=drone.s;
+     solid_count++;
+  
+
+     if (!GLEW_VERSION_2_0) {
+         fprintf(stderr, "OpenGL 2.0 not available\n");
+         return -1;
+     }
+
+     if (!make_resources()) {
+         fprintf(stderr, "Failed to load resources\n");
+         return -1;
+     }
+
+	 //clock_gettime(CLOCK_MONOTONIC, &last);
+     glutMainLoop();
+
+    return 0;
 }
 
 
