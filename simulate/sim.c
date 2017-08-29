@@ -1,5 +1,5 @@
 #include <stdlib.h>
-#include <GL/glew.h>
+# include <GL/glew.h>
 #ifdef __APPLE__
 #  include <GLUT/glut.h>
 #else
@@ -15,6 +15,7 @@
 #include "sim.h"
 #include "ball/util.h"
 #define MS_TO_NS(x) (1000000*(x))
+#define NS_TO_MS(x) ((x)/1000000)
 
 
 static struct {
@@ -43,48 +44,124 @@ static struct {
 } g_resources;
 
 
+
+
+
 //Constants
 double const GRAVITY_CONSTANT = 6.67408E-11;
 double const EARTH_MASS = 5.972E+24;//kg
 double const EARTH_RADIUS = 6371000;//in meters
 
 
-typedef struct {
-    Vec point;//point on object force is applied
-    Vec force;//direction and magnitude of force neutons
-} Force;
+Quadcopter new_quadcopter(){
+     Quadcopter q;
+     Force fr;
+     fr.point.x=1;
+     fr.point.y=-1;
+     fr.point.z=-1;
+     fr.force.x=0;
+     fr.force.y=0;
+     fr.force.z=0;
+     fr.start=0;
+
+     Force fl;
+     fl.point.x=-1;
+     fl.point.y=-1;
+     fl.point.z=-1;
+     fl.force.x=0;
+     fl.force.y=0;
+     fl.force.z=0;
+     fl.start=0;
+
+     Force bl;
+     bl.point.x=-1;
+     bl.point.y=-1;
+     bl.point.z=1;
+     bl.force.x=0;
+     bl.force.y=0;
+     bl.force.z=0;
+     bl.start=0;
+
+    Force br;
+     br.point.x=1;
+     br.point.y=-1;
+     br.point.z=1;
+     br.force.x=0;
+     br.force.y=0;
+     br.force.z=0;
+     br.start=0;
+
+     Force wind;
+     wind.point.x=0;
+     wind.point.y=0;
+     wind.point.z=0;
+     wind.force.x=.1;
+     wind.force.y=0;
+     wind.force.z=0;
+     wind.start=2000;
+     wind.stop=5000;
+
+     Force gravity;
+     gravity.point.x=0;
+     gravity.point.y=0;
+     gravity.point.z=0;
+     gravity.force.x=0;
+     gravity.force.y=-9.8;
+     gravity.force.z=0;
+     gravity.start=0;
+    
+    Cube cube;
+    new_cube(&cube);
+    cube.s.mass=1;
+    cube.s.forces[0]=fr;
+    cube.s.forces[1]=fl;
+    cube.s.forces[2]=bl;
+    cube.s.forces[3]=br;
+    cube.s.forces[4]=gravity;
+    cube.s.forces[5]=wind;
+
+    cube.s.forces_count=5;
+    cube.s.orientation.x=0;
+    cube.s.orientation.y=0;
+    cube.s.orientation.z=0;
+    cube.s.orientation.w=1;//identity quaternion
+
+    cube.s.position.x=0;
+    cube.s.position.y=0;
+    cube.s.position.z=0;
+
+    q.cube=cube;
+
+   return q; 
+}
+
+Quadcopter_hover(Quadcopter * q){
+  q->cube.s.forces[0].force.y=(float)9.8/4;
+  q->cube.s.forces[1].force.y=(float)9.8/4;
+  q->cube.s.forces[2].force.y=(float)9.8/4;
+  q->cube.s.forces[3].force.y=(float)9.8/4;
+}
 
 
-typedef struct {
-  Vec center_of_mass;
-  Vec ineritia;
-  Vec velocity;
- float mass;
-
- Force forces[10];
- int forces_count;
-
- float *verticies;
- float *normals;
- float *indicies;
- int verticies_size; 
- int indicies_size;
- int normals_size;
-
- GLfloat model_matrix[16];
-
-} Solid ;
-
-typedef struct {
-  Solid s;
-} Cube;
 
 //global variables
 Solid solids[2];
 int solid_count=0;
 struct timespec last, now;
 double elapsed = 0;
+double total_elapsed = 0;
 double hz=100;//times per second
+Quadcopter quadcopter;
+
+Quat new_quat(float angle,Vec axis){
+    Quat q;
+    q.w=cos(angle/2);
+    q.x=axis.x*sin(angle/2);
+    q.y=axis.y*sin(angle/2);
+    q.z=axis.z*sin(angle/2);
+    return q;
+}
+
 
 void new_cube(Cube *cube){
     float v[]={
@@ -153,6 +230,31 @@ void new_cube(Cube *cube){
     
     //setup default model matrix
 
+    // float m_matrix[16];
+// getNormals(&t_normals,v,sizeof(v));
+   // getModelMatrix(m_matrix);
+
+	cube->s.inertia_tensor[0]=1;
+	cube->s.inertia_tensor[1]=0;
+    cube->s.inertia_tensor[2]=0;
+    cube->s.inertia_tensor[3]=0;
+
+	cube->s.inertia_tensor[4]=0;
+	cube->s.inertia_tensor[5]=1;
+	cube->s.inertia_tensor[6]=0;
+	cube->s.inertia_tensor[7]=0; 
+
+	cube->s.inertia_tensor[8]=0;
+    cube->s.inertia_tensor[9]=0;
+    cube->s.inertia_tensor[10]=1;
+    cube->s.inertia_tensor[11]=0;
+
+	cube->s.inertia_tensor[12]=0;//x, or w/out transpose
+	cube->s.inertia_tensor[13]=0;//y,
+	cube->s.inertia_tensor[14]=0;//z
+	cube->s.inertia_tensor[15]=1;
+
+
      float m_matrix[16];
 // getNormals(&t_normals,v,sizeof(v));
    // getModelMatrix(m_matrix);
@@ -161,23 +263,38 @@ void new_cube(Cube *cube){
 	cube->s.model_matrix[1]=0;
     cube->s.model_matrix[2]=0;
     cube->s.model_matrix[3]=0;//x
-
 	cube->s.model_matrix[4]=0;
 	cube->s.model_matrix[5]=1;
 	cube->s.model_matrix[6]=0;
 	cube->s.model_matrix[7]=0; //y
-
 	cube->s.model_matrix[8]=0;
     cube->s.model_matrix[9]=0;
     cube->s.model_matrix[10]=1;
     cube->s.model_matrix[11]=0;//z???
-
 	cube->s.model_matrix[12]=0;//x, or w/out transpose
 	cube->s.model_matrix[13]=0;//y,
 	cube->s.model_matrix[14]=0;//z
 	cube->s.model_matrix[15]=1;
 
+}
 
+void get_position_matrix(float * m,Vec p){
+	m[0]=1;
+	m[1]=0;
+    m[2]=0;
+    m[3]=0;//x
+	m[4]=0;
+	m[5]=1;
+	m[6]=0;
+	m[7]=0; //y
+	m[8]=0;
+    m[9]=0;
+    m[10]=1;
+    m[11]=0;//z???
+	m[12]=p.x;//x, or w/out transpose
+	m[13]=p.y;//y,
+	m[14]=p.z;//z
+	m[15]=1;
 }
 
 //todo:make htis work
@@ -188,6 +305,26 @@ void get_indices(short *indicies ,int indicies_size){
     }
 }
 
+//not that the vector should be angular velocity vector
+Quat updateQuatByRotation(Quat update_quat, Vec v, float dt)
+{   
+		Quat w;
+		w.w=0;
+		w.x=v.x * dt;
+		w.y=v.y * dt;
+		w.z=v.z * dt ;
+
+		Quat new_quat=quat_mul(w,update_quat);
+
+		update_quat.w += new_quat.w * 0.5;
+		update_quat.x += new_quat.x * 0.5;
+		update_quat.y += new_quat.y * 0.5;
+		update_quat.z += new_quat.z * 0.5;
+
+		quat_norm(&update_quat);
+
+		return update_quat;
+}
 
 
 //this is the function getting called a bunch
@@ -202,7 +339,6 @@ void render()
    glUniform1f(g_resources.uniforms.fade_factor, g_resources.fade_factor);
 
    getViewMatrix(&g_resources.Vmatrix); //start at -10z
-
    getModelMatrix(&g_resources.Mmatrix); 
 
    //y, axes rotation -- we rotate the model not the view
@@ -223,9 +359,11 @@ void render()
 
 	int s=0;
     for(s=0;s<solid_count;s++){
+
+
        glUniformMatrix4fv(g_resources.uniforms.Mmatrix, 1, GL_FALSE, &solids[s].model_matrix);
 
-       fprintf(stderr,"x is :%f\n",solids[s].model_matrix[12]);
+       //fprintf(stderr,"x is :%f\n",solids[s].model_matrix[12]);
 
 
 	   g_resources.vertex_buffer = make_buffer(
@@ -355,8 +493,8 @@ void getViewMatrix(float *r_matrix){
     r_matrix[11]=0;
 
 	r_matrix[12]=0;//x, 
-	r_matrix[13]=0;//y,
-	r_matrix[14]=-5;//z
+	r_matrix[13]=2;//y,
+	r_matrix[14]=-50;//z
 	r_matrix[15]=1;
 }
 
@@ -509,32 +647,321 @@ float v_distance( Vec v1, Vec v2){
       );
 }
 
+void copy_matrix(float *a,float *b){
+    a[0]=b[0]; 
+    a[1]=b[1]; 
+    a[2]=b[2]; 
+    a[3]=b[3]; 
+    a[4]=b[4]; 
+    a[5]=b[5]; 
+    a[6]=b[6]; 
+    a[7]=b[7]; 
+    a[8]=b[8]; 
+    a[9]=b[9]; 
+    a[10]=b[10]; 
+    a[11]=b[11]; 
+    a[12]=b[12]; 
+    a[13]=b[13]; 
+    a[14]=b[14]; 
+    a[15]=b[15]; 
+    a[16]=b[16]; 
+}
+
+void copy_matrix_add(float *a,float *b){
+    a[0]+=b[0]; 
+    a[1]+=b[1]; 
+    a[2]+=b[2]; 
+    a[3]+=b[3]; 
+    a[4]+=b[4]; 
+    a[5]+=b[5]; 
+    a[6]+=b[6]; 
+    a[7]+=b[7]; 
+    a[8]+=b[8]; 
+    a[9]+=b[9]; 
+    a[10]+=b[10]; 
+    a[11]+=b[11]; 
+    a[12]+=b[12]; 
+    a[13]+=b[13]; 
+    a[14]+=b[14]; 
+    a[15]+=b[15]; 
+    a[16]+=b[16]; 
+}
+
+
+
+void Quadcopter_apply_to_all_thrust(Solid *s, float thrust){
+    s->forces[0].force.y=thrust;
+    s->forces[1].force.y=thrust;
+    s->forces[2].force.y=thrust;
+    s->forces[3].force.y=thrust;
+}
+
+void Quadcopter_go_to_height(Solid * s, float height){
+//   //we want to stabilize at a certain height   
+//   //if we are below height add more force,  if above add less force
+    float thrust=s->forces[0].force.y;
+
+    if(s->position.y < 1){
+        thrust=9.9/4;
+    } else {
+        thrust=9.7/4;
+    }
+
+    Quadcopter_apply_to_all_thrust(s,thrust);
+}
+
+
+float going_up_start_time=0;
+int done=0;
+
+void Quadcopter_up_one_meter(Solid * s, float height){
+    if(done==1){
+        return ;
+    }
+
+    if(going_up_start_time==0){
+        going_up_start_time=total_elapsed;
+        Quadcopter_apply_to_all_thrust(s,(9.8*2)/4);
+    }
+      fprintf(stderr, "TIME IS : %f\n",NS_TO_MS(total_elapsed-going_up_start_time));
+/// //stop after a second
+  if(3710 < NS_TO_MS(total_elapsed-going_up_start_time)){
+      Quadcopter_apply_to_all_thrust(s,0);
+  }
+
+  if(6000 < NS_TO_MS(total_elapsed-going_up_start_time)){
+      Quadcopter_apply_to_all_thrust(s,9.8/4);
+      done=1;
+  }
+
+}
+
+
+
 void sim(void){
 
+  Quadcopter_up_one_meter(&solids[0],1);
   float seconds=1/hz;
- //    fprintf(stderr, "Sim\n");
   int i;
   for(i=0;i<solid_count;i++){
+
+    //fprintf(stderr, "Y postition: %f\n",solids[i].position.y);
       int t;
+
+      Vec all_forces;
+        all_forces.x=0;
+        all_forces.y=0;
+        all_forces.z=0;
+
+      Vec all_torques;
+        all_torques.x=0;
+        all_torques.y=0;
+        all_torques.z=0;
+
+
+      //I think we should just sum forces
       for(t=0;t<solids[i].forces_count;t++){
+        //only test if start is set
+        if(solids[i].forces[t].start){
+                if( NS_TO_MS(total_elapsed) < solids[i].forces[t].start  || 
+                    NS_TO_MS(total_elapsed) > solids[i].forces[t].stop  
+            ){
+                continue;
+            }
+        }
 
-        //velocity = force/mass * time 
-    Vec accel= v_divide_s(solids[i].forces[t].force, solids[i].mass );
-     Vec velocity_new=v_mult_s(accel, seconds);
-     solids[i].velocity=v_add(velocity_new,solids[i].velocity);
-      
-      //then update the model matrix
+            
 
-  solids[i].model_matrix[12]+= (GLfloat) seconds * solids[i].velocity.x;
-  solids[i].model_matrix[13]+= (GLfloat) seconds * solids[i].velocity.y;
-  solids[i].model_matrix[14]+= (GLfloat) seconds * solids[i].velocity.z;
-      
+        all_forces=v_add(all_forces,solids[i].forces[t].force);
+        Vec pos;
+        pos.x=0;
+        pos.y=0;
+        pos.z=0;
+
+		//point of force = point - position(where position is center of mass)
+        Vec pf=v_sub(solids[i].forces[t].point,pos); //todo: get center point
+		//(1,0,0) x (0,1,0) = (0,0,1)
+		//ie: torque now represents axis of rotation and (i think) magnitude of rotation
+		//we are assuming 90% force
+        Vec new_torque=v_mult(solids[i].forces[t].force,pf);
+        all_torques=v_add(all_torques,new_torque);
       }
+
+
+        Vec accel= v_divide_s(all_forces, solids[i].mass);
+        Vec velocity_new=v_mult_s(accel, seconds);
+        solids[i].velocity=v_add(solids[i].velocity,velocity_new);
+
+        Vec pos_dela=v_mult_s(solids[i].velocity,seconds);
+        solids[i].position=v_add(solids[i].position,pos_dela);
+
+        float pos_matrix[16];
+        get_position_matrix(pos_matrix, solids[i].position);
+        
+        //rotational acceleration
+        //float torque = f * pf;//(point at which force is applied, relative to center of mass)
+		//A=F/m  Accel angular = Torque / intertia tensor
+		Vec angular_acelleration = all_torques;//divided by inertia tensor 
+		solids[i].angular_velocity = v_add(solids[i].angular_velocity,v_mult_s(angular_acelleration,seconds));
+        solids[i].orientation=updateQuatByRotation(solids[i].orientation, solids[i].angular_velocity,seconds);
+
+        float r_matrix[16];
+        quat_to_matrix(solids[i].orientation,&r_matrix);
+        mult_matrix(&pos_matrix,r_matrix);
+        copy_matrix(&solids[i].model_matrix,&pos_matrix);
 
       //update velocity
       //update position
   }
 }
+
+void mult_matrix(float *a,float *b){
+    float m[16];
+    int i=0;
+    for (i = 0; i < 4; i++) { 
+        float x=a[(i*4)+0];
+        float y=a[(i*4)+1];
+        float z=a[(i*4)+2];
+        float w=a[(i*4)+3];
+
+        m[(i*4)+0]=(x*b[0])+(y*b[1])+(z*b[2]) + (w*b[3]);
+        m[(i*4)+1]=(x*b[4])+(y*b[5])+(z*b[6]) + (w*b[7]) ;
+        m[(i*4)+2]=(x*b[8])+(y*b[9])+(z*b[10]) + (w*b[11]);
+        m[(i*4)+3]=(x*b[12])+(y*b[13])+(z*b[14]) + (w*b[15]);
+    }
+
+    a[0]=m[0]; 
+    a[1]=m[1]; 
+    a[2]=m[2]; 
+    a[3]=m[3]; 
+    a[4]=m[4]; 
+    a[5]=m[5]; 
+    a[6]=m[6]; 
+    a[7]=m[7]; 
+    a[8]=m[8]; 
+    a[9]=m[9]; 
+    a[10]=m[10]; 
+    a[11]=m[11]; 
+    a[12]=m[12]; 
+    a[13]=m[13]; 
+    a[14]=m[14]; 
+    a[15]=m[15]; 
+    a[16]=m[16]; 
+
+    //copy_matrix(&a,&m);
+}
+
+void quat_to_matrix(Quat q,float *r_matrix){
+
+    r_matrix[0]= 1 - ((2*(q.y*q.y))+ (2*(q.z*q.z)));
+    r_matrix[1]= (2*q.x*q.y) + (2*q.z*q.w);
+    r_matrix[2]= (2*q.x*q.z) - (2*q.y*q.w);
+    r_matrix[3]= 0;
+
+    r_matrix[4]= (2*q.x*q.y) - (2*q.z*q.w);
+    r_matrix[5]= 1- ((2*(q.x*q.x)) + (2*(q.z*q.z)));
+    r_matrix[6]= (2*q.y*q.z) + (2*q.x*q.w);
+    r_matrix[7]= 0;
+
+    r_matrix[8]= (2*q.x*q.z) + (2*q.y*q.w);
+    r_matrix[9]= (2*q.y*q.z) - (2*q.x*q.w);
+    r_matrix[10]= 1- ((2*(q.x*q.x)) + (2*(q.y*q.y)));
+    r_matrix[11]= 0;
+
+    r_matrix[12]= 0;
+    r_matrix[13]= 0;
+    r_matrix[14]= 0;
+    r_matrix[15]= 1;
+}
+
+void quat_norm(Quat * q){
+
+ float d= (q->w*q->w) + (q->x*q->x) + (q->y*q->y) + (q->z*q->z);
+
+ if(d==0){
+     q->w = 1;
+     q->x = 0;
+     q->y = 0;
+     q->z = 0;
+     return ;
+ }
+
+ float m  = sqrt(d);
+ q->w = q->w / m;
+ q->x = q->x / m;
+ q->y = q->y / m;
+ q->z = q->z / m ; 
+}
+
+Quat quat_mul(Quat q1,Quat q2) {
+
+	Quat q;
+//      q.x =  q1.x * q2.w + q1.y * q2.z - q1.z * q2.y + q1.w * q2.x;
+//      q.y = -q1.x * q2.z + q1.y * q2.w + q1.z * q2.x + q1.w * q2.y;
+//      q.z =  q1.x * q2.y - q1.y * q2.x + q1.z * q2.w + q1.w * q2.z;
+//      q.w = -q1.x * q2.x - q1.y * q2.y - q1.z * q2.z + q1.w * q2.w;
+    q.w = (q1.w*q2.w - q1.x*q2.x - q1.y*q2.y - q1.z*q2.z);
+    q.x = (q1.w*q2.x + q1.x*q2.w + q1.y*q2.z - q1.z*q2.y);
+    q.y = (q1.w*q2.y - q1.x*q2.z + q1.y*q2.w + q1.z*q2.x);
+    q.z = (q1.w*q2.z + q1.x*q2.y - q1.y*q2.x + q1.z*q2.w);
+
+
+    //quat_norm(&q);
+
+	return q;
+}
+
+Quat quat_add(Quat q1,Quat q2){
+	Quat c;
+    c.x = q1.x + q2.x;
+    c.y = q1.y + q2.y;
+    c.z = q1.z + q2.z;
+    c.w = q1.w + q2.w;
+	return c;
+}
+
+
+Vec v_norm( Vec v){
+    float l=sqrt(
+        (v.x*v.x) +
+        (v.y*v.y) +
+        (v.z*v.z)
+    );
+	 Vec nv;
+	nv.x=v.x/l;
+	nv.y=v.y/l;
+	nv.z=v.z/l;
+	return nv;
+}
+
+//dot product
+float v_dot( Vec v1, Vec v2){                                                                                  
+   Vec v1n=v_norm(v1); 
+   Vec v2n=v_norm(v2); 
+  return v1n.x * v2n.x + v1n.y * v2n.y + v1n.z * v2n.z; 
+}
+
+float quat_dot(Quat a, Quat b){
+  return a.x * b.x + a.y * b.y + a.z * b.z + a.w*b.w; 
+}
+
+
+//cross product or vector product
+Vec v_mult( Vec a, Vec b){
+        Vec v;
+        v.x=(a.y*b.z) - (a.z*b.y);
+        v.y= (a.z*b.x) - (a.x*b.z);
+        v.z= (a.x*b.y) -(a.y*b.x);
+        return v;
+}
+ //tay you pry don't want to use this
+ Vec v_mult_compenent_product(Vec a, Vec b ){
+      Vec c;
+      c.x=a.x*b.x;
+      c.y=a.y*b.y;
+      c.z=a.z*b.z;
+      return c;
+ } 
 
  Vec v_mult_s( Vec v,float m){
      Vec vf;
@@ -560,6 +987,22 @@ Vec v_add(Vec a, Vec b){
         return v;
 }
 
+Vec v_sub( Vec a, Vec b){
+         Vec v;
+        v.x=a.x-b.x;
+        v.y=a.y-b.y;
+        v.z=a.z-b.z;
+        return v;
+}
+
+float v_mag( Vec v){
+   return sqrt(
+        (v.x*v.x) +
+        (v.y*v.y) +
+        (v.z*v.z)
+    );
+}
+
 
 void simulate_timer(void){
 	last = now;
@@ -574,6 +1017,7 @@ void simulate_timer(void){
 			   (double)(now.tv_nsec - last.tv_nsec);
 
 	while (elapsed >= MS_TO_NS(1000/hz)) {
+        total_elapsed+=elapsed;
         elapsed -= MS_TO_NS(1000/hz);
         sim();
 		glutPostRedisplay();
@@ -581,8 +1025,10 @@ void simulate_timer(void){
 		 //render();
 	}
 }
-int main(int argc, char** argv){
 
+
+
+int main(int argc, char** argv){
 	 clock_gettime(CLOCK_MONOTONIC, &now);
 
      glutInit(&argc, argv);
@@ -599,25 +1045,11 @@ int main(int argc, char** argv){
      //glutKeyboardFunc(keyPressed);
      glewInit();
 
-     Cube drone;
-     new_cube(&drone);
-     drone.s.mass=1;
 
-     Force fr_force;//apply force to front right
-     fr_force.point.x=-1;
-     fr_force.point.y=-1;
-     fr_force.point.z=1;
-
-     fr_force.force.x=0;
-     fr_force.force.y=1;//neuton
-     fr_force.force.z=0;
-
-     drone.s.forces[0]=fr_force;
-     drone.s.forces_count=1;
-
-
-     solids[0]=drone.s;
-     solid_count++;
+    quadcopter=new_quadcopter();
+    Quadcopter_hover(&quadcopter);
+    solids[0]=quadcopter.cube.s;
+    solid_count++;
   
 
      if (!GLEW_VERSION_2_0) {

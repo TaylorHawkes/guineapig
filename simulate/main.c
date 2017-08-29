@@ -622,6 +622,7 @@ static GLuint make_program(GLuint vertex_shader, GLuint fragment_shader)
 
 
 
+//angle is degrees 
 void getRotateXMatrix(float angle,float *r_matrix){
     float a=angle * (M_PI /180);
 	r_matrix[0]=1;

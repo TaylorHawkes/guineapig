@@ -1,0 +1,73 @@
+  Quadcopter q;
+     q.fr.point.x=1;
+     q.fr.point.y=-1;
+     q.fr.point.z=-1;
+     q.fr.force.x=0;
+     q.fr.force.y=0;
+     q.fr.force.z=0;
+     q.fr.start=0;
+
+     q.fl.point.x=-1;
+     q.fl.point.y=-1;
+     q.fl.point.z=-1;
+     q.fl.force.x=0;
+     q.fl.force.y=0;
+     q.fl.force.z=0;
+     q.fl.start=0;
+
+     q.bl.point.x=-1;
+     q.bl.point.y=-1;
+     q.bl.point.z=1;
+     q.bl.force.x=0;
+     q.bl.force.y=0;
+     q.bl.force.z=0;
+     q.bl.start=0;
+
+     q.br.point.x=1;
+     q.br.point.y=-1;
+     q.br.point.z=1;
+     q.br.force.x=0;
+     q.br.force.y=0;
+     q.br.force.z=0;
+     q.br.start=0;
+
+     Force wind;
+     wind.point.x=0;
+     wind.point.y=0;
+     wind.point.z=0;
+     wind.force.x=.1;
+     wind.force.y=0;
+     wind.force.z=0;
+     wind.start=2000;
+     wind.stop=5000;
+
+     Force gravity;
+     gravity.point.x=0;
+     gravity.point.y=0;
+     gravity.point.z=0;
+     gravity.force.x=0;
+     gravity.force.y=-9.8;
+     gravity.force.z=0;
+     gravity.start=0;
+
+    new_cube(&q.cube);
+
+    q.cube.s.mass=1;
+    q.cube.s.forces[0]=q.fr;
+    q.cube.s.forces[1]=q.fl;
+    q.cube.s.forces[2]=q.bl;
+    q.cube.s.forces[3]=q.br;
+    q.cube.s.forces[4]=gravity;
+    q.cube.s.forces[5]=wind;
+
+    q.cube.s.forces_count=5;
+    q.cube.s.orientation.x=0;
+    q.cube.s.orientation.y=0;
+    q.cube.s.orientation.z=0;
+    q.cube.s.orientation.w=1;//identity quaternion
+
+    q.cube.s.position.x=0;
+    q.cube.s.position.y=0;
+    q.cube.s.position.z=0;
+
+
