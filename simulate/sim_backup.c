@@ -58,8 +58,7 @@ Quadcopter new_quadcopter(){
      Force fr;
      fr.point.x=1;
      fr.point.y=-1;
-     fr.point.z=-1;//-z is into screen
-    
+     fr.point.z=-1;
      fr.force.x=0;
      fr.force.y=0;
      fr.force.z=0;
@@ -92,32 +91,15 @@ Quadcopter new_quadcopter(){
      br.force.z=0;
      br.start=0;
 
-
      Force wind;
-     wind.point.x=1;
+     wind.point.x=0;
      wind.point.y=0;
-     wind.point.z=1;
-
-     wind.force.x=0;
-     wind.force.y=1;
+     wind.point.z=0;
+     wind.force.x=.1;
+     wind.force.y=0;
      wind.force.z=0;
-
-     wind.start=4700;
-     wind.stop=10000;
-
- //  Force wind2;
- //  wind2.point.x=1;
- //  wind2.point.y=0;
- //  wind2.point.z=0;
-
- //  wind2.force.x=0;
- //  wind2.force.y=1;
- //  wind2.force.z=0;
- //  wind2.start=4700;
- //  wind2.stop=10000;
-
-
-
+     wind.start=2000;
+     wind.stop=5000;
 
      Force gravity;
      gravity.point.x=0;
@@ -144,14 +126,12 @@ Quadcopter new_quadcopter(){
     cube.s.mass=1;
     cube.s.forces[0]=fr;
     cube.s.forces[1]=fl;
-    cube.s.forces[2]=br;
-    cube.s.forces[3]=bl;
-    cube.s.forces[4]=wind;
-    //cube.s.forces[5]=wind2;
-cube.s.forces[5]=gravity;
-////cube.s.forces[5]=wind;
+    cube.s.forces[2]=bl;
+    cube.s.forces[3]=br;
+    cube.s.forces[4]=gravity;
+    cube.s.forces[5]=upwardLiftOneSec;
 
-    cube.s.forces_count=6;
+    cube.s.forces_count=5;
     cube.s.orientation.x=0;
     cube.s.orientation.y=0;
     cube.s.orientation.z=0;
@@ -177,8 +157,9 @@ Quadcopter_hover(Quadcopter * q){
 
 //global variables
 Solid solids[2];
+Control controls[2];
+int controls_count=0;
 int solid_count=0;
-
 struct timespec last, now;
 double elapsed = 0;
 double elapsed2 = 0;
@@ -186,9 +167,6 @@ double total_elapsed = 0;
 double hz=100;//times per second
 double hz2=10;//this if for stabilizing 
 Quadcopter quadcopter;
-
-Control controls[3];
-int controls_count=0;
 
 Quat new_quat(float angle,Vec axis){
     Quat q;
@@ -334,7 +312,7 @@ void get_position_matrix(float * m,Vec p){
 	m[15]=1;
 }
 
-//todo:make htis 
+//todo:make htis work
 void get_indices(short *indicies ,int indicies_size){
 	int i=0;
     for (i = 0; i < indicies_size/sizeof(short); i++){ 
@@ -436,7 +414,7 @@ void render()
 }
 
 
-//This will onlly  with (x,4) * (4*4) matrix
+//This will onlly work with (x,4) * (4*4) matrix
 void multiplyMatrices(float *verticies, float translation[],int verticies_size,int translation_size){
 
     float result[verticies_size];
@@ -531,7 +509,7 @@ void getViewMatrix(float *r_matrix){
 
 	r_matrix[12]=0;//x, 
 	r_matrix[13]=2;//y,
-	r_matrix[14]=-20;//z
+	r_matrix[14]=-50;//z
 	r_matrix[15]=1;
 }
 
@@ -733,22 +711,17 @@ void Quadcopter_apply_to_all_thrust(Solid *s, float thrust){
     s->forces[3].force.y=thrust;
 }
 
-void Quadcopter_add_to_all_thrust(Solid *s, float thrust){
-    s->forces[0].force.y+=thrust;
-    s->forces[1].force.y+=thrust;
-    s->forces[2].force.y+=thrust;
-    s->forces[3].force.y+=thrust;
-}
-
 void Quadcopter_go_to_height(Solid * s, float height){
 //   //we want to stabilize at a certain height   
 //   //if we are below height add more force,  if above add less force
     float thrust=s->forces[0].force.y;
+
     if(s->position.y < 1){
         thrust=9.9/4;
     } else {
         thrust=9.7/4;
     }
+
     Quadcopter_apply_to_all_thrust(s,thrust);
 }
 
@@ -764,7 +737,7 @@ void Quadcopter_up_one_meter(Solid * s, float height){
         going_up_start_time=total_elapsed;
         Quadcopter_apply_to_all_thrust(s,(9.8*2)/4);
     }
-      //fprintf(stderr, "TIME IS : %f\n",NS_TO_MS(total_elapsed-going_up_start_time));
+      fprintf(stderr, "TIME IS : %f\n",NS_TO_MS(total_elapsed-going_up_start_time));
 /// //stop after a second
   if(3710 < NS_TO_MS(total_elapsed-going_up_start_time)){
       Quadcopter_apply_to_all_thrust(s,0);
@@ -777,106 +750,22 @@ void Quadcopter_up_one_meter(Solid * s, float height){
 
 }
 
-
-float ROLL_ERROR_TOTAL_I;
-float PITCH_ERROR_TOTAL_I;
-//float damping=.99999999999999999; 
-void Quadcopter_stabilize_orientation(Solid * s){
-    
-   Quat q=solids[0].orientation;
-
-   float yaw = atan2(2.0*(q.y*q.z + q.w*q.x), q.w*q.w - q.x*q.x - q.y*q.y + q.z*q.z);
-   float pitch = asin(-2.0*(q.x*q.z - q.w*q.y));
-   float roll = atan2(2.0*(q.x*q.y + q.w*q.z), q.w*q.w + q.x*q.x - q.y*q.y - q.z*q.z);
-
-   
-    float thrust=1;//this should be upward stabilization,,,, how do combine these things???
-
-    float desired_roll=0;
-    float T=desired_roll;
-    float desired_pitch =0;
-    float TT=desired_pitch;
-
-    float P=4;
-    float I=.5;
-
-    float PP=4;
-    float II=.5;
-
-    //float roll_error= T - roll;
-    float roll_error= T - solids[0].angular_velocity.z;
-    float pitch_error= TT - solids[0].angular_velocity.x;
-
-    ROLL_ERROR_TOTAL_I+=I*(roll_error)*(1/hz2);
-    PITCH_ERROR_TOTAL_I+=II*(pitch_error)*(1/hz2);
-
-
- //fprintf(stderr, "x IS : %f\n",solids[0].angular_velocity.x);
- //fprintf(stderr, "y IS : %f\n",solids[0].angular_velocity.y);
- //fprintf(stderr, "roll IS : %f\n",roll);
-    //work
-    
-    float right_thrust;
-    float left_thrust;
-    float back_thrust;
-    float front_thrust;
-
- ///cube.s.forces[0]=fr;
- ///cube.s.forces[1]=fl;
- ///cube.s.forces[3]=br;
- ///cube.s.forces[4]=bl;
-
-//  right_thrust=-((roll_error * P) + ROLL_ERROR_TOTAL_I);
-//  left_thrust=(roll_error * P) + ROLL_ERROR_TOTAL_I;
-
-  right_thrust=-((roll_error * P) + ROLL_ERROR_TOTAL_I);
-  left_thrust= (roll_error * P) + ROLL_ERROR_TOTAL_I ;
-
-  front_thrust=-((pitch_error * PP) + ROLL_ERROR_TOTAL_I);
-  back_thrust= (pitch_error * PP) + ROLL_ERROR_TOTAL_I ;
- //front_thrust=0;
- //back_thrust=0;
-
-
- fprintf(stderr, "front thrust  IS : %f\n",front_thrust);
- fprintf(stderr, "back thrust  IS : %f\n",back_thrust);
-
- // damping=damping*damping;
- // right_thrust*=damping;
- // left_thrust*=damping;
-    //
-    s->forces[0].force.y=min_0(right_thrust + front_thrust);
-    s->forces[1].force.y=min_0(left_thrust + front_thrust);
-    s->forces[2].force.y=min_0(right_thrust + back_thrust);
-    s->forces[3].force.y=min_0(left_thrust + back_thrust);
-
-}
-
-float min_0(float t){
-    return t;//todo:remove this 
-    if(t<0){
-       return 0; 
-    }
-    return t;
-}
-
-
 float TOTAL_I;
 void Quadcopter_stabilize_velocity(Solid * s, desired_velocity ){
-
     //fprintf(stderr, "POS  Y IS : %f\n",s->position.y);
     //fprintf(stderr, "VElocity  Y IS : %f\n",s->velocity.y);
     float T=desired_velocity;
-    float P=4.9;
-    float I=.5;
+    float P=-4.9;
+    float I=-.4;
     float thrust;
-    float velocity_error= T - s->velocity.y;
 
-    TOTAL_I+=I*(velocity_error)*(1/hz2);
+    float velocity_error = s->velocity.y;
+
+    TOTAL_I+=I * (velocity_error) * (1/hz2);
     //Proportional
-    thrust=(velocity_error * P) + TOTAL_I;
+    thrust=(velocity_error * P)  + TOTAL_I;
     //fprintf(stderr, "THRUST  Y IS : %f\n",thrust);
-    Quadcopter_add_to_all_thrust(s,thrust);
+    Quadcopter_apply_to_all_thrust(s,thrust);
 }
 
 void apply_controls(){
@@ -886,16 +775,9 @@ void apply_controls(){
             NS_TO_MS(total_elapsed) > controls[i].stop  
         ){ continue; }
 
-         if(controls[i].first_run==1){
-            //reset the integration error
-             controls[i].first_run=0;
-             TOTAL_I=0;
-         }
-
-         Quadcopter_stabilize_orientation(&solids[0]);
-         //be sure ot stabilize orientation first
          Quadcopter_stabilize_velocity(&solids[0],controls[i].a_value);
   }
+    
 }
 
 
@@ -921,7 +803,7 @@ void sim(void){
 
 
       //I think we should just sum forces
-
+       fprintf(stderr, "TIM: %f\n",NS_TO_MS(total_elapsed));
       for(t=0;t<solids[i].forces_count;t++){
         //only test if start is set
         if(solids[i].forces[t].start){
@@ -931,8 +813,6 @@ void sim(void){
                 continue;
             }
         }
-
-            
 
         all_forces=v_add(all_forces,solids[i].forces[t].force);
         Vec pos;
@@ -1186,7 +1066,7 @@ void simulate_timer(void){
     //this loop is for real life
 	while (elapsed2 >= MS_TO_NS(1000/hz2)) {
         elapsed2 -= MS_TO_NS(1000/hz2);
-        apply_controls();
+        //apply_controls();
         //Quadcopter_stabilize_velocity(&solids[0],0);
 	}
 
@@ -1222,43 +1102,20 @@ int main(int argc, char** argv){
 
 
     quadcopter=new_quadcopter();
-
+    
     Control go_up_control;
     go_up_control.start=0;
     go_up_control.stop=20000;
+    go_up_control.action="velocity_y";
     go_up_control.a_value=0;
-    go_up_control.first_run=1;
-
-
-    Control c2;//this is just hack, I have messed someting up w/ memory and it's not '
-    c2.start=20000;
-    c2.stop=35000;
-    c2.a_value=2;
-    c2.first_run=1;
-
-    Control c3;//this is just hack, I have messed someting up w/ memory and it's not '
-    c3.start=35000;
-    c3.stop=1244000;
-    c3.a_value=0;
-    c3.first_run=1;
-
-    Control c4;//this is just hack, I have messed someting up w/ memory and it's not n'
-
-
     controls[0]=go_up_control;
-    controls[1]=c2;
-    controls[2]=c3;
-    controls_count=3;
+    controls_count++;
 
 
     //Quadcopter_hover(&quadcopter);
     solids[0]=quadcopter.cube.s;
     solid_count++;
   
-
-    //controls_count++;
-
-
 
      if (!GLEW_VERSION_2_0) {
          fprintf(stderr, "OpenGL 2.0 not available\n");

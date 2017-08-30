@@ -91,6 +91,17 @@ typedef struct{
     Cube cube;
 } Quadcopter;
 
+typedef struct{
+   int first_run;
+   float start;
+   float stop;
+   char * action;
+   int a_value;
+} Control;
+
+float min_0(float t);
+
+
 Quadcopter_hover(Quadcopter * q);
 Quadcopter new_quadcopter();
 
