@@ -4,9 +4,9 @@
 #include <SD.h>
 
 #define LOG_PORT SERIAL_PORT_USBVIRTUAL
-#define SERIAL_BAUD_RATE 9600 // Serial port baud
+#define SERIAL_BAUD_RATE 4800 // Serial port baud
 #define INTERRUPT_PIN 4 // MPU-9250 INT pin tied to D4
-#define SAMPLE_RATE 10  //10Hz.
+#define SAMPLE_RATE 100  //10Hz.
 #define FIFO_CORRUPTION_CHECK 1
 
 //#include <Wire.h> // Depending on your Arduino version, you may need to include Wire.h
@@ -33,7 +33,6 @@ int br_power_add=0;
 
 void setup()
 {
-
    Wire.begin(); // join i2c bus (address optional for master)
    LOG_PORT.begin(SERIAL_BAUD_RATE);
 	if (imu.begin() != INV_SUCCESS){
@@ -93,118 +92,160 @@ float qToFloat(long number, unsigned char q)
     }
     return (number >> q) + ((number & mask) / (float) (2<<(q-1)));
 }
-void loop(){
 
+float ROLL_ERROR_TOTAL_I;
+float PITCH_ERROR_TOTAL_I;
+float ROLL_ERROR_TOTAL_OUTER_I=0;
+float PITCH_ERROR_TOTAL_OUTER_I=0;
+float desired_roll_velocity=0;
+float desired_pitch_velocity =0;
+int master_loop_count=0;
+float pitch_error_last=0;
+float roll_error_last=0;
+
+
+
+void loop(){
 //we are going digital usine fifo
+
 if (!imu.fifoAvailable() ) { return; }
 if (imu.dmpUpdateFifo() != INV_SUCCESS ){ return; }
 
+//NOTE THAT GYRO DATA IS ANGULAR VELOCITY  
+//ACCELORMATOR IS ACCELERATION
+
 // if ( digitalRead(INTERRUPT_PIN) == LOW ) // If MPU-9250 interrupt fires (active-low)
 // imu.update();// Update all sensor's
-	  String imuLog = ""; // Create a fresh line to log
-	 imuLog += String(imu.time) + ","; // Add time to log string
+	String imuLog = ""; // Create a fresh line to log
+	//imuLog += ","; // Add time to log string
+//	imuLog += String(imu.time) + ","; // Add time to log string
+    //THIS IS EULAR LOOP, RUNS 1/10 times and outputs desired_roll/pitch
+   // master_loop_count++;
+   // if(master_loop_count==1){
+      imu.computeEulerAngles2(false);
+        //2000,1000 is not bad
+        //2500/400 is better
+        float P_PITCH=2500;//this is gain
+        float P_ROLL=2500;//this gain
 
-     imu.computeEulerAngles2(false);
-    // imu.computeEulerAngles2();
+        float I_OUTER = 0;
+        float II_OUTER= 0;
 
-    imuLog += String(imu.yaw) + ",";
-	imuLog += String(imu.pitch) + ",";
-	imuLog += String(imu.roll) + ",";
-	imuLog += String(imu.normal) + ",";
-
-    imuLog += String(imu.ax) + ",";
-	imuLog += String(imu.ay) + ",";
-	imuLog += String(imu.az) + ",";
-
-    imuLog += String(imu.gx) + ",";
-	imuLog += String(imu.gy) + ",";
-	imuLog += String(imu.gz) + ",";
-
-    imuLog += String(imu.dqxr) + ",";
-	imuLog += String(imu.dqyr) + ",";
-	imuLog += String(imu.dqzr) + ",";
-	imuLog += String(imu.dqwr) + ",";
-
-    //normalized
-    imuLog += String(imu.dqx) + ",";
-	imuLog += String(imu.dqy) + ",";
-	imuLog += String(imu.dqz) + ",";
-	imuLog += String(imu.dqw) + ",";
+        //we get steady small ossilation in the system when this is too high
+        float D_OUTER = 500;
+        float DD_OUTER= 500;
 
 
+        float desired_roll=M_PI;
+        float desired_pitch=0;
+        float pitch_error=-(desired_pitch-imu.pitch);
+        float roll_error= (desired_roll- abs(imu.roll)) * (abs(imu.roll)/imu.roll);
+        //Roll is weirdly 3.14 or -3.14 if we go over it then gets closer to 0 either way if we are over or under so 
+        //we multiply by 1,or -1
+
+        ROLL_ERROR_TOTAL_OUTER_I+=(I_OUTER*roll_error)/SAMPLE_RATE;
+        PITCH_ERROR_TOTAL_OUTER_I+=  (II_OUTER*pitch_error)/SAMPLE_RATE;
+
+
+        float d_roll_error = D_OUTER * ((roll_error - roll_error_last) / ((float) 1/SAMPLE_RATE));
+        float d_pitch_error = DD_OUTER * ((pitch_error - pitch_error_last) / ((float) 1/SAMPLE_RATE));
+
+
+        desired_pitch_velocity=(pitch_error*P_PITCH)+PITCH_ERROR_TOTAL_OUTER_I + d_pitch_error;
+        desired_roll_velocity=(roll_error*P_ROLL)+ROLL_ERROR_TOTAL_OUTER_I + d_roll_error;
+
+      // imuLog += String(imu.pitch) + ",";
+      // imuLog += String(imu.roll) + ",";
+    //  master_loop_count=0;
+   //}
+
+    //BELOW IS RATE LOOP//
+    //we have desired roll velocity as input and we try to get as close to that as possible
+    float base_value=0;
+    float T=desired_roll_velocity;
+    float TT=desired_pitch_velocity;
+
+    float P=.05;
+    float I=0;
+    float PP=.05;
+    float II=0;
+
+    
+    //imu.gx(-2000 through 2000)
+    //X does seem to be pitch roll access
+
+    float roll_error_velocity= T ;//- imu.gx;
+    //Y does seem to be pitch access
+    //there is lots of noise?
+    float pitch_error_velocity= TT ;//- imu.gy;
+
+    ROLL_ERROR_TOTAL_I+=I*(roll_error_velocity)*(1/SAMPLE_RATE);
+    PITCH_ERROR_TOTAL_I+=II*(pitch_error_velocity)*(1/SAMPLE_RATE);
+
+    float right_thrust;
+    float left_thrust;
+    float back_thrust;
+    float front_thrust;
+
+   right_thrust=((roll_error_velocity * P) + ROLL_ERROR_TOTAL_I);
+   left_thrust=-(roll_error_velocity * P) + ROLL_ERROR_TOTAL_I ;
+   front_thrust=-((pitch_error_velocity * PP) + ROLL_ERROR_TOTAL_I);
+   back_thrust= (pitch_error_velocity * PP) + ROLL_ERROR_TOTAL_I ;
 
 
 
+   int fr=min_0(base_value+right_thrust + front_thrust);
+   int fl=min_0(base_value+left_thrust + front_thrust);
+   int br=min_0(base_value+right_thrust + back_thrust);
+   int bl=min_0(base_value+left_thrust + back_thrust);
+
+   imuLog += String(fr) + ",";
+   imuLog += String(fl) + ",";
+   imuLog += String(br) + ",";
+   imuLog += String(bl) + ",";
 
 
 
-	LOG_PORT.println(imuLog);
+  // imu.computeEulerAngles2();
+
+    //imuLog += String(imu.yaw) + ",";
+    //imuLog += String(imu.pitch) + ",";
+    //imuLog += String(imu.roll) + ",";
+    //imuLog += String(imu.normal) + ",";
+
+    //imuLog += String(imu.ax) + ",";
+    //imuLog += String(imu.ay) + ",";
+    //imuLog += String(imu.az) + ",";
+
+    //imuLog += String(imu.gx) + ",";
+    //imuLog += String(imu.gy) + ",";
+    //imuLog += String(imu.gz) + ",";
+
+    //imuLog += String(imu.dqxr) + ",";
+    //imuLog += String(imu.dqyr) + ",";
+    //imuLog += String(imu.dqzr) + ",";
+    //imuLog += String(imu.dqwr) + ",";
+
+    ////normalized
+    //imuLog += String(imu.dqx) + ",";
+    //imuLog += String(imu.dqy) + ",";
+    //imuLog += String(imu.dqz) + ",";
+    //imuLog += String(imu.dqw) + ",";
+
+
 	//  imuLog += String(imu.roll, 2) + ", ";
 	//  imuLog += String(imu.yaw, 2) + ", ";
-//	write_to_ardunio(imuLog);
-	
-	//we are tring to get a 0 pitch angle
 
-	float br_pitch_power_to_add=0;
+//    LOG_PORT.println(desired_pitch);
+	write_to_ardunio(imuLog);
 
-	
-	//float f=imu.pitch;	
-
-	if(imu.pitch > 0.02){
-		br_pitch_power_to_add= (imu.pitch) * pitch_ratio; 
-	}else if(imu.pitch <  -0.02){
-		br_pitch_power_to_add= (imu.pitch) * pitch_ratio; 
-	}
-
-	//we are dropping low and need more power
-
-	if(imu.pitch > 2 && imu.pitch < 90){
-		br_pitch_power_to_add= (imu.pitch) * pitch_ratio; 
-	}else if(imu.pitch > 250 && imu.pitch < 358){
-		br_pitch_power_to_add= -1*(360-imu.pitch) * pitch_ratio; 
-	}
-
-	//we are tring to get a 0 roational velocity
-	//br - downward velocity is negative 
-	//velocity at 0 has jitter of about 20 for some reason	
-	float br_velocity_power_to_add=0;
-	//we need upward velocity ..more power
-////if(imu.gx < -40){
-////	br_velocity_power_to_add= t_abs(imu.gx) * velocity_ratio; 
-////}else if(imu.gx > 40){
-////	//we need downward velocity ..less power
-////	br_velocity_power_to_add=  -1 * imu.gx * velocity_ratio; 
-////}
-
-	new_br_power_add= (int) br_pitch_power_to_add + (int) br_velocity_power_to_add;
-
-    //as front right goes up this go more negative,
-    //so as front right increases when need to add more power to it
-//   if(imu.gx >= (stablex+close_enough_to_being_stable))
-//   {
-//       //we need to add power 
-//     fl_power_add=(t_abs(imu.gx)/power_add_ratio);
-//   }else if(imu.gx <= (stablex-close_enough_to_being_stable)){
-//       //we need to remove power 
-//      fl_power_add=(t_abs(imu.gx)/power_add_ratio) * -1;//we are saying this is happneing to often
-//   }
-
-//if(new_br_power_add != br_power_add)	{
-	 br_power_add=new_br_power_add;
-	 int fl_power=fl_power_base-br_power_add;
-	 int br_power=br_power_base+br_power_add;
-    //  imuLog += String(fl_power) + ",";
-    //  imuLog += String(br_power) + ",";
-//	  write_to_ardunio(imuLog);
-// } 	
-
-
-     // ... do stuff with imu.ax, imu.ay, etc.
- //}
+    pitch_error_last=pitch_error;
+    roll_error_last=roll_error;
 }
 
 void write_to_ardunio(String tstring){
 
+//TAYLOR THIS BREAKS IF STRING IS TOO LONG
   LOG_PORT.println(tstring);
   tstring += "\r\n"; // Add a new line
   int str_len = tstring.length() + 1; 
@@ -223,6 +264,17 @@ float t_abs(float tnumber){
     }else{
         return tnumber * -1;
     }
+}
+
+float min_0(float t){
+return t;    
+////if(t<1170){
+////       return 1170; 
+////}
+////if(t>1700){
+////    return  1700;    
+////}
+////return t;
 }
 
 

@@ -94,21 +94,21 @@ Quadcopter new_quadcopter(){
 
 
      Force wind;
-     wind.point.x=1;
-     wind.point.y=0;
-     wind.point.z=1;
+     wind.point.x=0;
+     wind.point.y=1;
+     wind.point.z=0;
 
      wind.force.x=0;
      wind.force.y=1;
      wind.force.z=0;
 
-     wind.start=4700;
+     wind.start=2000;
      wind.stop=10000;
 
- //  Force wind2;
- //  wind2.point.x=1;
- //  wind2.point.y=0;
- //  wind2.point.z=0;
+   Force wind2;
+   wind2.point.x=0;
+   wind2.point.y=1;
+   wind2.point.z=0;
 
  //  wind2.force.x=0;
  //  wind2.force.y=1;
@@ -148,10 +148,10 @@ Quadcopter new_quadcopter(){
     cube.s.forces[3]=bl;
     cube.s.forces[4]=wind;
     //cube.s.forces[5]=wind2;
-cube.s.forces[5]=gravity;
+   // cube.s.forces[5]=gravity;
 ////cube.s.forces[5]=wind;
 
-    cube.s.forces_count=6;
+    cube.s.forces_count=5;
     cube.s.orientation.x=0;
     cube.s.orientation.y=0;
     cube.s.orientation.z=0;
@@ -790,7 +790,7 @@ void Quadcopter_stabilize_orientation(Solid * s){
    float roll = atan2(2.0*(q.x*q.y + q.w*q.z), q.w*q.w + q.x*q.x - q.y*q.y - q.z*q.z);
 
    
-    float thrust=1;//this should be upward stabilization,,,, how do combine these things???
+    float thrust=1;
 
     float desired_roll=0;
     float T=desired_roll;
@@ -892,9 +892,9 @@ void apply_controls(){
              TOTAL_I=0;
          }
 
-         Quadcopter_stabilize_orientation(&solids[0]);
+        // Quadcopter_stabilize_orientation(&solids[0]);
          //be sure ot stabilize orientation first
-         Quadcopter_stabilize_velocity(&solids[0],controls[i].a_value);
+        // Quadcopter_stabilize_velocity(&solids[0],controls[i].a_value);
   }
 }
 
