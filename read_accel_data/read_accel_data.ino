@@ -35,7 +35,6 @@ int old_bl=0;
 int old_br=0;
 
 
-
 void setup()
 {
   Serial.begin(4800);           // start serial for output 
@@ -52,7 +51,15 @@ void setup()
     bl.write(hover_speed);
     br.write(hover_speed);
 
+    //sleep 20 second so we can turn this thing on
+   // delay(20000);
+
      startTCPServer();
+
+     Wire.begin(4);       
+     Wire.onReceive(receiveEvent); // register even  
+
+
 //   while(Serial.available() == 0){}
 //    input_value = Serial.parseInt();    // Parse an Integer from Serial 
 //      if(input_value==666){
@@ -64,16 +71,27 @@ void setup()
 
 //using the SIM5320A - (with antena) and hologram
 void startTCPServer(){
-  gsm.write("AT+CGDCONT=1,\"IP\",\"hologram\",\"0.0.0.0\"\r"); res();
-  Serial.println("starting socket server");
-  gsm.write("AT+CGSOCKCONT=1,\"IP\",\"hologram\"\r"); res();
-  gsm.write("AT+CSOCKSETPN=1\r"); res();
-  gsm.write("AT+CIPMODE=0\r"); res();
-  gsm.write("AT+NETOPEN\r"); res();
-  //this is for tcp
-  //	gsm.write("AT+SERVERSTART=8080,0\r"); res();
-  //I think this (udp) may be a little quicker
-  gsm.write("AT+CIPOPEN=0,\"UDP\",,,9000\r"); res();
+//gsm.write("AT+CGDCONT=1,\"IP\",\"hologram\",\"0.0.0.0\"\r"); res();
+//Serial.println("starting socket server");
+//gsm.write("AT+CGSOCKCONT=1,\"IP\",\"hologram\"\r"); res();
+//gsm.write("AT+CSOCKSETPN=1\r"); res();
+//gsm.write("AT+CIPMODE=0\r"); res();
+//gsm.write("AT+NETOPEN\r"); res();
+////this is for tcp
+////	gsm.write("AT+SERVERSTART=8080,0\r"); res();
+////I think this (udp) may be a little quicker
+//gsm.write("AT+CIPOPEN=0,\"UDP\",,,9000\r"); res();
+
+delay(20000);
+gsm.write("AT+CIPMODE=1\r"); res();
+gsm.write("AT+NETOPEN\r"); res();
+gsm.write("AT+CIPOPEN=0,\"UDP\",\"23.92.20.100\",9999,9000\r"); res();
+//gsm.write("AT+CIPOPEN=0,\"UDP\",,,9000\r"); res();
+//gsm.write("AT+CIPSEND=0,5,\"23.92.20.100\",9999\r"); res();
+//gsm.write("taylor\r"); res();
+//gsm.write("cool\r"); 
+//AT+CIPOPEN=0,"UDP","23.92.20.100",9999,9998""""
+
 }
 
 void res(){
@@ -83,38 +101,79 @@ void res(){
   };
 }
 
+int loop_count=0;
+int read_input=0;
+int read_input_count=0;
+char new_hover_rate[5];
+
 void loop()
 {
-if(start){
-     int new_fr=set_range(hover_speed+fr_power_int);
-     if(new_fr!=old_fr){
-        fr.write(new_fr);
-        old_fr=new_fr;
-     }
+   loop_count++;
 
-     int new_fl=set_range(hover_speed+fl_power_int);
-     if(new_fl!=old_fl){
-        fl.write(new_fl);
-        old_fl=new_fl;
-     }
+  int new_fr=set_range(hover_speed+fr_power_int);
 
-     int new_bl=set_range(hover_speed+bl_power_int);
-     if(new_bl!=old_bl){
-        bl.write(new_bl);
-        old_bl=new_bl;
-     }
+  if(new_fr!=old_fr){
+    fr.write(new_fr);
+    old_fr=new_fr;
+  }
 
-     int new_br=set_range(hover_speed+br_power_int);
-     if(new_br!=old_br){
-        br.write(new_br);
-        old_br=new_br;
-     }
-}
+  int new_fl=set_range(hover_speed+fl_power_int);
+  if(new_fl!=old_fl){
+    fl.write(new_fl);
+    old_fl=new_fl;
+  }
+
+  int new_bl=set_range(hover_speed+bl_power_int);
+  if(new_bl!=old_bl){
+    bl.write(new_bl);
+    old_bl=new_bl;
+  }
+
+  int new_br=set_range(hover_speed+br_power_int);
+  if(new_br!=old_br){
+    br.write(new_br);
+    old_br=new_br;
+  }
+
+  delayMicroseconds(1000);//micros sends in 1 millions of a second
+
+  if(loop_count > 100)//loopcount will be in 1 thousnad of a second 100=1/10nth of second 
+  {
+      gsm.write("ok"); 
+      while (gsm.available() > 0){
+          char c=gsm.read();
+          if(c=='['){
+              read_input=1;
+              read_input_count=0;
+              continue;
+          }
+          if(read_input && c==']'){
+              new_hover_rate[read_input_count]='\n';
+              int new_hover_speed=atoi(new_hover_rate);
+
+              if(new_hover_speed != hover_speed){
+                  hover_speed=new_hover_speed;
+                 // Serial.print("hover speed changed:");
+                 // Serial.println(hover_speed);
+              }
+              read_input=0;
+              read_input_count=0;
+              continue;
+          }
+
+          if(read_input){
+              new_hover_rate[read_input_count]=c;
+              read_input_count++;
+          }
+
+      };
+      loop_count=0;
+  }
+
+return;
 
  //Taylor consider removing htis not sure if it helps , hurts does, does anything
  //1000fps max
- delayMicroseconds(1000);
-
  while (gsm.available() > 0){
    String c=gsm.readString();
    Serial.println("--read something---");
@@ -208,10 +267,10 @@ int x = Wire.read();// receive byte as an integer
 
 int set_range(int r){
 	if(r > 2000) {
-			 return 2000;
+         return 2000;
 	}
-	if(r < 1070) {
-		return 1070;
+	if(r < 1000) {
+		return 1000;
 	}
 	return r;
 }
