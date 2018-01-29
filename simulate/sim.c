@@ -342,14 +342,14 @@ void get_indices(short *indicies ,int indicies_size){
     }
 }
 
-//not that the vector should be angular velocity vector
+//note that the vector should be angular velocity vector
 Quat updateQuatByRotation(Quat update_quat, Vec v, float dt)
 {   
 		Quat w;
 		w.w=0;
 		w.x=v.x * dt;
 		w.y=v.y * dt;
-		w.z=v.z * dt ;
+		w.z=v.z * dt;
 
 		Quat new_quat=quat_mul(w,update_quat);
 

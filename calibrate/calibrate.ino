@@ -3,8 +3,6 @@
 //we start at the top,then move to bottom within 2 seconds of turning on to set throttle range.
 int value = 1000; // set values you need to zero
 int input_value = 0;
-int min=1000;
-int max=2000;
 
 ServoTimer2 fl;
 ServoTimer2 fr;
@@ -13,12 +11,12 @@ ServoTimer2 br;
 
 void setup() {
 
-  fl.attach(7);   
-  fr.attach(8);
+  fl.attach(4);   
+  fr.attach(5);
   bl.attach(6);
-  br.attach(10);
+  br.attach(7);
 
-  Serial.begin(4800);    // start serial at 9600 baud
+  Serial.begin(9600);    // start serial at 9600 baud
  
   fl.write(value);
   fr.write(value);
