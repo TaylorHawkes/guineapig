@@ -13,7 +13,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <math.h>
-
+#define CALIBRATING 0
 
 int IMAGE_WIDTH = 640;
 int IMAGE_HEIGHT = 480;
@@ -306,7 +306,46 @@ int v4l2_streamoff(int fd) {
 }
 
 void compare_images(){
+
+
     int x,y,yy;
+#if CALIBRATING
+    int hits=0;
+  for (x = 200; x < (201); x += 1) {
+      for (y = 0; y < (IMAGE_WIDTH * 3); y += 3) {
+	  double d_smallest=1000;
+	  int best_match_pixel=0;
+          for (yy = y; yy > 3; yy -= 3) {
+                double d = sqrt(
+                      //pixel 1
+                  pow(data_buffer1[3*(x*IMAGE_WIDTH)+y]-data_buffer2[3*(x*IMAGE_WIDTH)+yy],2)+
+                  pow(data_buffer1[3*(x*IMAGE_WIDTH)+y+1]-data_buffer2[3*(x*IMAGE_WIDTH)+yy+1],2)+
+                  pow(data_buffer1[3*(x*IMAGE_WIDTH)+y+2]-data_buffer2[3*(x*IMAGE_WIDTH)+yy+2],2)+
+                      //pixel2
+                  pow(data_buffer1[x*IMAGE_WIDTH+y+1]-data_buffer2[x*IMAGE_WIDTH+yy+1],2)+
+                  pow(data_buffer1[x*IMAGE_WIDTH+y+1+1]-data_buffer2[x*IMAGE_WIDTH+yy+1+1],2)+
+                  pow(data_buffer1[x*IMAGE_WIDTH+y+2+1]-data_buffer2[x*IMAGE_WIDTH+yy+2+1],2)
+
+                 );
+
+                 if(d < d_smallest){
+                    d_smallest=d;
+                 }
+                 if(d_smallest <=5){
+                     best_match_pixel=yy;
+                     hits+=1;
+                     break;
+                 }
+
+          }
+      }
+
+  }
+
+fprintf(stderr, "hits %i\n", hits);
+return;
+#endif
+
 //we know the pixel will be to the right of the image
 
 // fprintf(stderr,"%d",image_1[20]);
@@ -317,7 +356,7 @@ void compare_images(){
 //          fprintf(stderr,"%d",image_1[j]);
 //  }
 
-  for (x = 0; x < (20); x += 1) {
+  for (x = 0; x < (400); x += 1) {
       for (y = 0; y < (IMAGE_WIDTH * 3); y += 3) {
 
 	  double d_smallest=1000;
@@ -343,7 +382,7 @@ void compare_images(){
                  if(d < d_smallest){
                     d_smallest=d;
                  }
-                 if(d_smallest <=20){
+                 if(d_smallest <=5){
                      best_match_pixel=yy;
                      break;
                  }
@@ -351,21 +390,21 @@ void compare_images(){
           }
           //if we found a match
           if(best_match_pixel){
-              int distance=best_match_pixel-y;
+              //y = 640 * 3
+              //best patch pixel is 
+              int distance=(best_match_pixel-y)/3;
               int color=255 - round(distance * .6375);
-              color=100;
                final_image[3*(x*IMAGE_WIDTH)+y]=color;
                final_image[3*(x*IMAGE_WIDTH)+y+1]=color;
                final_image[3*(x*IMAGE_WIDTH)+y+2]=color;
           }else{
-               final_image[3*(x*IMAGE_WIDTH)+y]=0;
-               final_image[3*(x*IMAGE_WIDTH)+y+1]=0;
-               final_image[3*(x*IMAGE_WIDTH)+y+2]=0;
+               final_image[3*(x*IMAGE_WIDTH)+y]=255;
+               final_image[3*(x*IMAGE_WIDTH)+y+1]=255;
+               final_image[3*(x*IMAGE_WIDTH)+y+2]=255;
           }
       }
   }
 
-         fprintf(stderr,"Cool we are done \n");
 }
 
 /*****

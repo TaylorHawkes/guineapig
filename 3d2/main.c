@@ -13,6 +13,7 @@
 #define SAVE_EVERY_FRAME 0
 #define DEPTH_MAP 1
 #define USE_MJPEG 0
+#define CALIBRATING 0
 
 pthread_t thread_stream;
 SDL_Window *sdlScreen;
@@ -36,10 +37,11 @@ void print_help() {
 
 static void frame_handler(void *pframe, int length,void *pframe2, int length2) {
 
+#if !CALIBRATING
 v4lconvert_yuyv_to_rgb24((unsigned char *) pframe, data_buffer1);
 v4lconvert_yuyv_to_rgb24((unsigned char *) pframe2, data_buffer2);
-
 compare_images();
+#endif;
 
 
 #if !USE_MJPEG
@@ -179,6 +181,15 @@ if (!IMG_Init(IMG_INIT_JPG)) {
 ///  if (handler)
 ///    (*handler)(v4l2_ubuffers[buf.index].start,
 ///               v4l2_ubuffers[buf.index].length);
+#if CALIBRATING
+
+if (handler)
+  (*handler)(v4l2_ubuffers[buf.index].start,
+             v4l2_ubuffers[buf.index].length,
+             v4l2_ubuffers[buf.index].start,
+             v4l2_ubuffers[buf.index].length);
+#endif;
+
 
       buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
       buf.memory = V4L2_MEMORY_MMAP;
@@ -198,11 +209,23 @@ if (!IMG_Init(IMG_INIT_JPG)) {
         return NULL;
       }
 
+    //change this back
+
+#if CALIBRATING
+    if (handler)
+      (*handler)(v4l2_ubuffers2[buf.index].start,
+                 v4l2_ubuffers2[buf.index].length,
+                 v4l2_ubuffers2[buf.index].start,
+                 v4l2_ubuffers2[buf.index].length);
+#endif
+
+#if !CALIBRATING
     if (handler)
       (*handler)(v4l2_ubuffers[buf.index].start,
                  v4l2_ubuffers[buf.index].length,
                  v4l2_ubuffers2[buf.index].start,
                  v4l2_ubuffers2[buf.index].length);
+#endif
 
       buf2.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
       buf2.memory = V4L2_MEMORY_MMAP;
@@ -296,7 +319,7 @@ int main(int argc, char const *argv[]) {
   }
 
   //// most of devices support YUYV422 packed.
-  if (v4l2_sfmt(video_fildes2, V4L2_PIX_FMT_YUYV) == -1) {
+  if (v4l2_sfmt(video_fildes2, format) == -1) {
     perror("v4l2_sfmt");
     goto exit_;
   }
