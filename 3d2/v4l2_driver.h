@@ -18,6 +18,21 @@ struct v4l2_ubuffer {
   unsigned int length;
 };
 
+
+struct edge_array {
+  unsigned char  p1_r;
+  unsigned char  p1_g;
+  unsigned char  p1_b;
+  unsigned char  p2_r;
+  unsigned char  p2_g;
+  unsigned char  p2_b;
+  int x; 
+  int y; 
+
+};
+
+extern struct  edge_array **second_image_edges;
+
 extern struct v4l2_ubuffer *v4l2_ubuffers;
 extern struct v4l2_ubuffer *v4l2_ubuffers2;
 

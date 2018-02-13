@@ -188,7 +188,7 @@ if (handler)
              v4l2_ubuffers[buf.index].length,
              v4l2_ubuffers[buf.index].start,
              v4l2_ubuffers[buf.index].length);
-#endif;
+#endif
 
 
       buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
@@ -212,6 +212,8 @@ if (handler)
     //change this back
 
 #if CALIBRATING
+//sleep(1);
+    usleep(100000);//1/10 of a second
     if (handler)
       (*handler)(v4l2_ubuffers2[buf.index].start,
                  v4l2_ubuffers2[buf.index].length,
@@ -290,7 +292,7 @@ int main(int argc, char const *argv[]) {
     goto exit_;
   }
 
-  if (v4l2_sfps(video_fildes, 5) == -1) { // no fatal error
+  if (v4l2_sfps(video_fildes, 20) == -1) { // no fatal error
     perror("v4l2_sfps");
   }
 
@@ -329,7 +331,7 @@ int main(int argc, char const *argv[]) {
     goto exit_;
   }
 
-  if (v4l2_sfps(video_fildes2, 5) == -1) { // no fatal error
+  if (v4l2_sfps(video_fildes2, 20) == -1) { // no fatal error
     perror("v4l2_sfps");
   }
 

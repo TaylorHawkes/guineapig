@@ -14,16 +14,22 @@
 #include <unistd.h>
 #include <math.h>
 #define CALIBRATING 0
+#define CALIBRATING2 0
+#define EDGE_DETECT 1
 
 int IMAGE_WIDTH = 640;
 int IMAGE_HEIGHT = 480;
 struct v4l2_ubuffer *v4l2_ubuffers;
 struct v4l2_ubuffer *v4l2_ubuffers2;
+struct  edge_array **second_image_edges;
 
 
 unsigned char   *data_buffer1;
 unsigned char   *data_buffer2;
 unsigned char   *final_image;
+
+
+
 size_t stride;  
 
 
@@ -195,6 +201,7 @@ int v4l2_mmap(int fd) {
 
   data_buffer1 = (unsigned char *) malloc(IMAGE_HEIGHT * IMAGE_WIDTH * 3 * sizeof(char));
   final_image = (unsigned char *) malloc(IMAGE_HEIGHT * IMAGE_WIDTH * 3 * sizeof(char));
+ // second_image_edges = (unsigned char *) malloc(IMAGE_HEIGHT * IMAGE_WIDTH * 6 * sizeof(char));
 
   // request for 4 buffers
   struct v4l2_requestbuffers req;
@@ -309,6 +316,21 @@ void compare_images(){
 
 
     int x,y,yy;
+
+#if CALIBRATING2
+    int hits=0;
+  for (x = 200; x < (400); x += 1) {
+      for (y = 0; y < (IMAGE_WIDTH * 3); y += 3) {
+              int color=data_buffer1[3*(x*IMAGE_WIDTH)+y+1];
+               final_image[3*(x*IMAGE_WIDTH)+y]=color;
+               final_image[3*(x*IMAGE_WIDTH)+y+1]=color;
+               final_image[3*(x*IMAGE_WIDTH)+y+2]=color;
+      }
+
+  }
+
+return;
+#endif
 #if CALIBRATING
     int hits=0;
   for (x = 200; x < (201); x += 1) {
@@ -346,6 +368,146 @@ fprintf(stderr, "hits %i\n", hits);
 return;
 #endif
 
+#if EDGE_DETECT
+    int hits=0;
+    int edge=0;
+    int color=0;
+
+//first we populate the second image with edges
+
+second_image_edges = (struct edge_array **) malloc(IMAGE_HEIGHT *  sizeof(struct edge_array*));
+
+for (x = 0; x < (IMAGE_HEIGHT); x += 1) {
+    second_image_edges[x] = (struct edge_array*) malloc(IMAGE_WIDTH * sizeof(struct edge_array));
+}
+
+
+int second_image_edges_counts[480]={0};
+int second_image_edges_count=0;
+
+  for (x = 0; x < (IMAGE_HEIGHT); x += 1) {
+      for (y = 0; y < (IMAGE_WIDTH * 3); y += 3) {
+            double d = sqrt(
+              pow(data_buffer2[3*(x*IMAGE_WIDTH)+y]-data_buffer2[3*(x*IMAGE_WIDTH)+y+3],2)+
+              pow(data_buffer2[3*(x*IMAGE_WIDTH)+y+1]-data_buffer2[3*(x*IMAGE_WIDTH)+y+4],2)+
+              pow(data_buffer2[3*(x*IMAGE_WIDTH)+y+2]-data_buffer2[3*(x*IMAGE_WIDTH)+y+5],2)
+            );
+            if(d > 5){
+                 edge=1;
+                 second_image_edges_counts[x]+=1;
+                //second_image_edges_counts
+            }else{
+                 edge=0;
+            }
+            if(edge){
+               struct edge_array e; 
+               e.p1_r= data_buffer2[3*(x*IMAGE_WIDTH)+y +0];
+               e.p1_g= data_buffer2[3*(x*IMAGE_WIDTH)+y +1];
+               e.p1_b= data_buffer2[3*(x*IMAGE_WIDTH)+y +2];
+               e.p2_r= data_buffer2[3*(x*IMAGE_WIDTH)+y +3];
+               e.p2_g= data_buffer2[3*(x*IMAGE_WIDTH)+y +4];
+               e.p2_b= data_buffer2[3*(x*IMAGE_WIDTH)+y +5];
+               e.x=x;
+               e.y=y;
+               //this is a cube we are searching
+               second_image_edges[x][second_image_edges_counts[x]]=e;
+            }
+    }
+  }
+    fprintf(stderr,"Edge count image 2 %d\n",second_image_edges_count);
+
+ int image_1_edge_count=0;
+ int fifty_count=0;
+ int xx=0;
+  for (x = 0; x < (IMAGE_HEIGHT); x += 1) {
+      for (y = 0; y < (IMAGE_WIDTH * 3); y += 3) {
+            double d = sqrt(
+              pow(data_buffer1[3*(x*IMAGE_WIDTH)+y]-data_buffer1[3*(x*IMAGE_WIDTH)+y+3],2)+
+              pow(data_buffer1[3*(x*IMAGE_WIDTH)+y+1]-data_buffer1[3*(x*IMAGE_WIDTH)+y+4],2)+
+              pow(data_buffer1[3*(x*IMAGE_WIDTH)+y+2]-data_buffer1[3*(x*IMAGE_WIDTH)+y+5],2)
+            );
+            
+            if(d > 20){
+                 edge=1;
+                 image_1_edge_count +=1;
+            }else{
+                 edge=0;
+            }
+            //what if we assume simliar amount of edges then only check back and foward kinda close to this amount???
+
+             fifty_count+=1;
+            if(edge && fifty_count >= 1){
+                fifty_count=0;
+                 double d_smallest=1000;
+                 int best_match_pixel=0;
+                 
+                 int xx_min=x-5;
+                 int xx_max=x+5;
+                 if(xx_min < 0) {
+                     xx_min=0;
+                 }
+                 if(xx_max > IMAGE_HEIGHT){
+                     xx_max=IMAGE_HEIGHT;
+                 }
+                 
+                 //only test every 50th pixel
+                 for (yy = 0; yy < second_image_edges_counts[x]; yy += 1) {
+                     for (xx = xx_min; xx < xx_max; xx += 1) {
+                        double d = sqrt(
+                              //pixel 1
+                         pow((int) data_buffer1[3*(x*IMAGE_WIDTH)+y+0]- (int) second_image_edges[xx][yy].p1_r,2)+
+                         pow((int) data_buffer1[3*(x*IMAGE_WIDTH)+y+1]- (int) second_image_edges[xx][yy].p1_g,2)+
+                         pow((int) data_buffer1[3*(x*IMAGE_WIDTH)+y+2]- (int) second_image_edges[xx][yy].p1_b,2)+
+                       //     //pixel2
+                         pow((int) data_buffer1[x*IMAGE_WIDTH+y+1+0]- (int) second_image_edges[xx][yy].p2_r,2)+
+                         pow((int) data_buffer1[x*IMAGE_WIDTH+y+1+1]- (int) second_image_edges[xx][yy].p2_g,2)+
+                         pow((int) data_buffer1[x*IMAGE_WIDTH+y+1+2]- (int) second_image_edges[xx][yy].p2_b,2)
+                         );
+
+                         if(d <=20){
+                             best_match_pixel=1;
+                             break;
+                         }
+                    }
+                    if(best_match_pixel){
+                        break;
+                    }
+              }
+
+              //if we found a match
+              if(best_match_pixel){
+                 //fprintf(stderr," :good we hit here --------------- \n");
+                  //y = 640 * 3
+                  //best patch pixel is 
+              //  int distance=(best_match_pixel-y)/3;
+              //  int color=255 - round(distance * .6375);
+                   final_image[3*(x*IMAGE_WIDTH)+y]=0;
+                   final_image[3*(x*IMAGE_WIDTH)+y+1]=0;
+                   final_image[3*(x*IMAGE_WIDTH)+y+2]=0;
+              }else{
+                 //fprintf(stderr," bad miss\n");
+                   final_image[3*(x*IMAGE_WIDTH)+y]=255;
+                   final_image[3*(x*IMAGE_WIDTH)+y+1]=255;
+                   final_image[3*(x*IMAGE_WIDTH)+y+2]=255;
+              }
+        }else{
+               final_image[3*(x*IMAGE_WIDTH)+y]=255;
+               final_image[3*(x*IMAGE_WIDTH)+y+1]=255;
+               final_image[3*(x*IMAGE_WIDTH)+y+2]=255;
+
+        }
+
+
+      }
+
+  }
+
+
+    fprintf(stderr,"Edge count image 1 %d\n",image_1_edge_count);
+return;
+#endif
+
+
 //we know the pixel will be to the right of the image
 
 // fprintf(stderr,"%d",image_1[20]);
@@ -361,7 +523,7 @@ return;
 
 	  double d_smallest=1000;
 	  int best_match_pixel=0;
-          for (yy = y; yy > 3; yy -= 3) {
+          for (yy = y; yy < IMAGE_WIDTH*3; yy += 3) {
                 double d = sqrt(
                       //pixel 1
                   pow(data_buffer1[3*(x*IMAGE_WIDTH)+y]-data_buffer2[3*(x*IMAGE_WIDTH)+yy],2)+
@@ -382,7 +544,7 @@ return;
                  if(d < d_smallest){
                     d_smallest=d;
                  }
-                 if(d_smallest <=5){
+                 if(d_smallest <=20){
                      best_match_pixel=yy;
                      break;
                  }
@@ -394,6 +556,7 @@ return;
               //best patch pixel is 
               int distance=(best_match_pixel-y)/3;
               int color=255 - round(distance * .6375);
+
                final_image[3*(x*IMAGE_WIDTH)+y]=color;
                final_image[3*(x*IMAGE_WIDTH)+y+1]=color;
                final_image[3*(x*IMAGE_WIDTH)+y+2]=color;
