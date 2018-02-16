@@ -65,7 +65,7 @@ void get_camera_data(){
       ioctl(video_fildes, VIDIOC_QBUF, &buf);
     }
 
-    //camera 2
+//camera 2
     if (FD_ISSET(video_fildes2, &fds2)) {
       memset(&buf2, 0, sizeof(buf2));
       buf2.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
@@ -78,8 +78,6 @@ void get_camera_data(){
       buf2.memory = V4L2_MEMORY_MMAP;
       ioctl(video_fildes2, VIDIOC_QBUF, &buf2);
     }
-
-
 
     compare_images();
 
@@ -107,7 +105,7 @@ void start_cameras(){
   v4l2_sfmt(video_fildes2, format);
   v4l2_gfmt(video_fildes2);
   v4l2_sfps(video_fildes2, 20);
-  v4l2_mmap(video_fildes2);
+  v4l2_mmap2(video_fildes2);
   v4l2_streamon(video_fildes2);
 
 }
@@ -144,26 +142,37 @@ int main( void )
 	// Get a handle for our "MVP" uniform
 	GLuint MatrixID = glGetUniformLocation(programID, "MVP");
 	
-    GLfloat g_vertex_buffer_data[9000] = {0.0};
+    GLfloat g_vertex_buffer_data[1000000] = {0.0};
 
-	GLuint vertexbuffer;
-	glGenBuffers(1, &vertexbuffer);
-	glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(g_vertex_buffer_data), g_vertex_buffer_data, GL_STATIC_DRAW);
+    GLuint vertexbuffer;
+    glGenBuffers(1, &vertexbuffer);
+    glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
 
 	do{
         //first we get camera info
         get_camera_data();
         int x,y,c=0;
 
-          for (x = 0; x < (40); x += 1) {
-              for (y = 0; y < (40) ; y += 1) {
-                  g_vertex_buffer_data[c]   = (GLfloat)  x;
-                  g_vertex_buffer_data[c+1] = (GLfloat)  y;
-                  g_vertex_buffer_data[c+2] = (GLfloat)  0;//this is depth
-                  c+=3;
-              }
-        }
+//GLfloat g_vertex_buffer_data[] = { 
+//    0.0f, 0.0f, 0.0f,
+//    3.0f, 0.0f, 0.0f,
+//    0.0f,  1.0f, 0.0f,
+//};
+
+//its closer to 45
+//400 / 10 = 40
+for (x = 0; x < (image_1_edge_match_count_total * 3); x += 3) {
+        //x is actually y (and its backwords)
+        //y is actually x
+        //fprintf(stderr, " pos: %f \n",final_image_pos[x+0]);
+        g_vertex_buffer_data[x]  = (GLfloat)  final_image_pos[x+1]/100;
+        g_vertex_buffer_data[x+1] = 4 - (GLfloat)  final_image_pos[x+0]/100;
+        g_vertex_buffer_data[x+2] = - (GLfloat) final_image_pos[x+2] /100;//this is depth
+}
+
+
+
+	    glBufferData(GL_ARRAY_BUFFER, sizeof(g_vertex_buffer_data), g_vertex_buffer_data, GL_STATIC_DRAW);
 
 		glClear( GL_COLOR_BUFFER_BIT );
 		glUseProgram(programID);
@@ -190,8 +199,8 @@ int main( void )
 		);
 
 		// Draw the triangle !
-		glDrawArrays(GL_TRIANGLES, 0, 3); // 3 indices starting at 0 -> 1 triangle
-		//glDrawArrays(GL_POINTS, 0, 3); // 3 indices starting at 0 -> 1 triangle
+	//	glDrawArrays(GL_TRIANGLES, 0, sizeof(g_vertex_buffer_data)/4); // 3 indices starting at 0 -> 1 triangle
+		glDrawArrays(GL_POINTS, 0, sizeof(g_vertex_buffer_data)/4); // 3 indices starting at 0 -> 1 triangle
 
 		glDisableVertexAttribArray(0);
 

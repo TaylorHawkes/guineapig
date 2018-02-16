@@ -24,9 +24,14 @@ struct v4l2_ubuffer *v4l2_ubuffers2;
 struct  edge_array **second_image_edges;
 
 
+int image_1_edge_count=0;
+int image_1_edge_match_count_total=0;
+int c=0;
+
 unsigned char   *data_buffer1;
 unsigned char   *data_buffer2;
 unsigned char   *final_image;
+float  *final_image_pos;
 
 
 
@@ -201,6 +206,8 @@ int v4l2_mmap(int fd){
 
   data_buffer1 = (unsigned char *) malloc(IMAGE_HEIGHT * IMAGE_WIDTH * 3 * sizeof(char));
   final_image = (unsigned char *) malloc(IMAGE_HEIGHT * IMAGE_WIDTH * 3 * sizeof(char));
+  final_image_pos = (float *) malloc(IMAGE_HEIGHT * IMAGE_WIDTH * 3 * sizeof(float));
+
  // second_image_edges = (unsigned char *) malloc(IMAGE_HEIGHT * IMAGE_WIDTH * 6 * sizeof(char));
 
   // request for 4 buffers
@@ -413,11 +420,10 @@ int second_image_edges_count=0;
             }
     }
   }
-    fprintf(stderr,"Edge count image 2 %d\n",second_image_edges_count);
 
- int image_1_edge_count=0;
  int fifty_count=0;
  int xx=0;
+ image_1_edge_count=0;
   for (x = 0; x < (IMAGE_HEIGHT); x += 1) {
       for (y = 0; y < (IMAGE_WIDTH * 3); y += 3) {
             double d = sqrt(
@@ -434,8 +440,8 @@ int second_image_edges_count=0;
             }
             //what if we assume simliar amount of edges then only check back and foward kinda close to this amount???
 
-             fifty_count+=1;
-            if(edge && fifty_count >= 1){
+            fifty_count+=1;
+            if(edge && fifty_count >= 5){
                 fifty_count=0;
                  double d_smallest=1000;
                  int best_match_pixel=0;
@@ -463,7 +469,7 @@ int second_image_edges_count=0;
                          pow((int) data_buffer1[x*IMAGE_WIDTH+y+1+2]- (int) second_image_edges[xx][yy].p2_b,2)
                          );
 
-                         if(d <=14){
+                         if(d <=8){
                              best_match_pixel=second_image_edges[xx][yy].y;
                              break;
                          }
@@ -478,11 +484,17 @@ int second_image_edges_count=0;
                  //fprintf(stderr," :good we hit here --------------- \n");
                   //y = 640 * 3
                   //best patch pixel is 
-                int distance=(best_match_pixel-y)/3;
-                int color= 255- round(distance * .6375);
+                int distance=680-((best_match_pixel-y)/3);
+                //int color= 255- round(distance * .6375);
                    final_image[3*(x*IMAGE_WIDTH)+y]=color;
                    final_image[3*(x*IMAGE_WIDTH)+y+1]=color;
                    final_image[3*(x*IMAGE_WIDTH)+y+2]=color;
+
+                   final_image_pos[c+0]=x;
+                   final_image_pos[c+1]=(y/3);
+                   final_image_pos[c+2]=distance;
+                   c+=3;
+                   image_1_edge_match_count_total+=1;
               }else{
                  //fprintf(stderr," bad miss\n");
                    final_image[3*(x*IMAGE_WIDTH)+y]=0;
@@ -503,6 +515,7 @@ int second_image_edges_count=0;
 
 
     fprintf(stderr,"Edge count image 1 %d\n",image_1_edge_count);
+    fprintf(stderr,"Edge count total matches: %d\n",image_1_edge_match_count_total);
 return;
 #endif
 

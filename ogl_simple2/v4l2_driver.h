@@ -13,6 +13,10 @@ extern int IMAGE_WIDTH;
 extern int IMAGE_HEIGHT;
 extern size_t stride;  
 
+extern int image_1_edge_count;
+
+extern int image_1_edge_match_count_total;
+
 struct v4l2_ubuffer {
   void *start;
   unsigned int length;
@@ -40,6 +44,7 @@ extern struct v4l2_ubuffer *v4l2_ubuffers2;
 extern unsigned char   *data_buffer1;
 extern unsigned char   *data_buffer2;
 extern unsigned char   *final_image;
+extern float  *final_image_pos;
 
 
 /* functions */
