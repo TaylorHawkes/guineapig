@@ -12,8 +12,8 @@
 
 #define SAVE_EVERY_FRAME 0
 #define DEPTH_MAP 1
-#define USE_MJPEG 0
-#define CALIBRATING 0
+#define USE_MJPEG 1
+#define CALIBRATING 1
 
 pthread_t thread_stream;
 SDL_Window *sdlScreen;

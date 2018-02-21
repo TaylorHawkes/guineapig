@@ -141,7 +141,7 @@ int v4l2_sfps(int fd, int fps) {
   return 0;
 }
 
-int v4l2_mmap2(int fd) {
+int v4l2_mmap2(int fd){
 
   //map for rgb data
   data_buffer2 = (unsigned char *) malloc(IMAGE_HEIGHT * IMAGE_WIDTH * 3 * sizeof(char));

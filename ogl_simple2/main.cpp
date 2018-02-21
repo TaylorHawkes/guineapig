@@ -6,6 +6,9 @@
 #include <sys/ioctl.h>
 #include <time.h>
 #include <unistd.h>
+#include "../MPU6050/I2Cdev.h"
+#include "../MPU6050/MPU6050.h"
+
 
 // Include standard headers
 #include <stdio.h>
@@ -23,6 +26,8 @@ GLFWwindow* window;
 // Include GLM
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtx/quaternion.hpp>
+
 using namespace glm;
 
 #include "common/shader.hpp"
@@ -30,6 +35,17 @@ using namespace glm;
 //to add controls just add header common/controls.hpp and computeMatricesFromInputs(); 
 
 int video_fildes,video_fildes2;
+float a_pitch_final,a_roll_final;
+
+int16_t ax, ay, az;
+int16_t gx, gy, gz;
+
+MPU6050 accelgyro;
+
+float DEGREES_TO_RADIANS=0.01745329251; //multiplier PI/180
+float GYRO_DPS =65.5;//https://cdn.sparkfun.com/assets/learn_tutorials/5/5/0/MPU9250REV1.0.pdf
+
+
 
 void get_camera_data(){
   fd_set fds;
@@ -114,6 +130,12 @@ void start_cameras(){
 
 int main( void )
 {
+    vec3 EulerAngles(0, 0, 0);
+    quat currentOrientation = quat(EulerAngles); 
+
+    accelgyro.initialize();//init accel/gyro
+    printf(accelgyro.testConnection() ? "MPU6050 connection successful\n" : "MPU6050 connection failed\n");
+
     start_cameras();
 
     glfwInit() ;//no eror
@@ -142,46 +164,151 @@ int main( void )
 	// Get a handle for our "MVP" uniform
 	GLuint MatrixID = glGetUniformLocation(programID, "MVP");
 	
-    GLfloat g_vertex_buffer_data[1000000] = {0.0};
+    //GLfloat g_vertex_buffer_data[1000000] = {0.0};
 
     GLuint vertexbuffer;
     glGenBuffers(1, &vertexbuffer);
     glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
 
+
+
+    GLfloat g_vertex_buffer_data[] = { 
+        //rect front
+		0.0f,1.0f,0.0f, 
+		8.0f,0.0f,0.0f,
+		0.0f, 0.0f,0.0f,
+        0.0f,1.0f,0.0f, 
+		8.0f,1.0f,0.0f,
+		8.0f, 0.0f,0.0f,
+
+        //rect right side
+        8.0f,1.0f,0.0f, 
+		8.0f,0.0f,-4.0f,
+		8.0f, 0.0f,0.0f,
+        8.0f,1.0f,0.0f, 
+		8.0f,1.0f,-4.0f,
+		8.0f, 0.0f,-4.0f,
+
+        //rect left side
+        0.0f,1.0f,0.0f, 
+		0.0f,0.0f,-4.0f,
+		0.0f, 0.0f,0.0f,
+        0.0f,1.0f,0.0f, 
+		0.0f,1.0f,-4.0f,
+		0.0f, 0.0f,-4.0f,
+
+        //rect back
+		0.0f,1.0f,-4.0f, 
+		8.0f,0.0f,-4.0f,
+		0.0f, 0.0f,-4.0f,
+        0.0f,1.0f,-4.0f, 
+		8.0f,1.0f,-4.0f,
+		8.0f, 0.0f,-4.0f,
+
+
+        //rect bottom
+    	0.0f,0.0f,0.0f, 
+		8.0f,0.0f,0.0f,
+		8.0f, 0.0f,-4.0f,
+        0.0f,0.0f,0.0f, 
+		8.0f,0.0f,-4.0f,
+		0.0f, 0.0f,-4.0f,
+
+        //rect top
+    	0.0f,1.0f,0.0f, 
+		8.0f,1.0f,0.0f,
+		8.0f, 1.0f,-4.0f,
+        0.0f,1.0f,0.0f, 
+		8.0f,1.0f,-4.0f,
+		0.0f, 1.0f,-4.0f,
+
+        //forward triange
+    	3.0f,1.0f,-4.0f, 
+		5.0f,1.0f,-4.0f,
+		4.0f,1.0f,-7.0f,
+	};
+
+
+
 	do{
         //first we get camera info
-        get_camera_data();
+//        get_camera_data();
+
+        accelgyro.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
         int x,y,c=0;
 
-//GLfloat g_vertex_buffer_data[] = { 
-//    0.0f, 0.0f, 0.0f,
-//    3.0f, 0.0f, 0.0f,
-//    0.0f,  1.0f, 0.0f,
-//};
 
 //its closer to 45
 //400 / 10 = 40
-for (x = 0; x < (image_1_edge_match_count_total * 3); x += 3) {
-        //x is actually y (and its backwords)
-        //y is actually x
-        //fprintf(stderr, " pos: %f \n",final_image_pos[x+0]);
-        g_vertex_buffer_data[x]  = (GLfloat)  final_image_pos[x+1]/100;
-        g_vertex_buffer_data[x+1] = 4 - (GLfloat)  final_image_pos[x+0]/100;
-        g_vertex_buffer_data[x+2] = - (GLfloat) final_image_pos[x+2] /100;//this is depth
-}
-
+//  for (x = 0; x < (image_1_edge_match_count_total * 3); x += 3) {
+//          //x is actually y (and its backwords)
+//          //y is actually x
+//          //fprintf(stderr, " pos: %f \n",final_image_pos[x+0]);
+//          g_vertex_buffer_data[x]  = (GLfloat)  final_image_pos[x+1]/100;
+//          g_vertex_buffer_data[x+1] = 4 - (GLfloat)  final_image_pos[x+0]/100;
+//          g_vertex_buffer_data[x+2] = - (GLfloat) final_image_pos[x+2] /100;//this is depth
+//  }
 
 
 	    glBufferData(GL_ARRAY_BUFFER, sizeof(g_vertex_buffer_data), g_vertex_buffer_data, GL_STATIC_DRAW);
 
-		glClear( GL_COLOR_BUFFER_BIT );
+		glClear(GL_COLOR_BUFFER_BIT);
 		glUseProgram(programID);
 
         computeMatricesFromInputs();
 		glm::mat4 ProjectionMatrix = getProjectionMatrix();
 		glm::mat4 ViewMatrix = getViewMatrix();
-		glm::mat4 ModelMatrix = glm::mat4(1.0);
-		glm::mat4 MVP = ProjectionMatrix * ViewMatrix * ModelMatrix;
+
+
+        //fprintf(stderr, " rotation: %f \n",(gx/(GYRO_DPS * DEGREES_TO_RADIANS)) * .05);
+        float delta_seconds=0.05;
+
+        vec3 gyro(
+         (-gy/GYRO_DPS) * DEGREES_TO_RADIANS * delta_seconds, //this is pitch
+         (gz/GYRO_DPS) * DEGREES_TO_RADIANS * delta_seconds, //this moves  yaw (z apparently)
+         (-gx/GYRO_DPS) * DEGREES_TO_RADIANS * delta_seconds //roll
+       );
+
+
+        quat gyroQuat = quat(gyro);
+        currentOrientation = currentOrientation * gyroQuat;
+        mat4 currentOrientationMatrix = glm::toMat4(currentOrientation);
+
+
+        float acc_total_vector = sqrt((ax*ax)+(ay*ay)+(az*az));
+        if(abs(ax) < acc_total_vector){
+             a_pitch_final = -asin((float)ax/acc_total_vector);
+        }
+        if(abs(ay) < acc_total_vector){
+             a_roll_final = asin((float)ay/acc_total_vector);
+        }
+
+        glm::vec3 gyroEuler = glm::eulerAngles(currentOrientation); 	
+
+        vec3 accell(
+            -a_pitch_final, //this is pitch
+            -gyroEuler.z,
+            -a_roll_final
+        );
+
+        vec3 acell_gyro_delta(
+            accell.x-gyro.x, //this is pitch
+            accell.z-gyro.z, //yaw
+            accell.y-gyro.y //roll maybe
+        );
+
+        //acell_gyro_delta*= 0.1f;//scale diff down
+
+        quat accelcorrectionQuat = quat(acell_gyro_delta);
+
+	    glm::mat4 accelcorrectionMatrix=  glm::toMat4(accelcorrectionQuat) ;
+
+        //currentOrientationMatrix*=accelcorrectionMatrix;
+
+		glm::mat4 MVP = ProjectionMatrix * ViewMatrix * accelcorrectionMatrix;
+
+
+
 
 		// Send our transformation to the currently bound shader, 
 		// in the "MVP" uniform
@@ -199,8 +326,8 @@ for (x = 0; x < (image_1_edge_match_count_total * 3); x += 3) {
 		);
 
 		// Draw the triangle !
-	//	glDrawArrays(GL_TRIANGLES, 0, sizeof(g_vertex_buffer_data)/4); // 3 indices starting at 0 -> 1 triangle
-		glDrawArrays(GL_POINTS, 0, sizeof(g_vertex_buffer_data)/4); // 3 indices starting at 0 -> 1 triangle
+		glDrawArrays(GL_TRIANGLES, 0, sizeof(g_vertex_buffer_data)/4); // 3 indices starting at 0 -> 1 triangle
+	//	glDrawArrays(GL_POINTS, 0, sizeof(g_vertex_buffer_data)/4); // 3 indices starting at 0 -> 1 triangle
 
 		glDisableVertexAttribArray(0);
 
