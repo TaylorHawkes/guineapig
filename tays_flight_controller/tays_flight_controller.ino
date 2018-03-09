@@ -365,10 +365,12 @@ void get_gyro_data(double dt_p){
     //Serial.println(accel.x);
     //calculate acc eulers
     //4200 roughly g force of gravity
+
+    //booo this is sucks... use tranlation matrix 
     acc_total_diff = acc_total_vector_calibrate-acc_total_vector;
     upward_accel=-(acc_total_diff / acc_total_vector_calibrate);
     
-    //we should ge dot product as it may be at tilt
+    //we should ge dot product as it may be at tilt ... booo
     // go to 0 to prevent drift
     
     vel.y= (vel.y*.995) + (upward_accel * dt_p);
@@ -400,7 +402,7 @@ void get_gyro_data(double dt_p){
 	//65.5 = 1degree per second
 	//23580 = 360 degrees per second
 	//degrees to radions = degress* PI/180 or degrees * 0.01745329251  
-	gyro.x=gyro_roll_velocity/GYRO_DPS * DEGREES_TO_RADIANS;
+	gyro.x=gyro_roll_velocity/GYRO_DPS * DEGREES_TO_RADIANS;//x is roll
 	gyro.y=gyro_pitch_velocity/GYRO_DPS * DEGREES_TO_RADIANS;
 	gyro.z=gyro_yaw_velocity/GYRO_DPS* DEGREES_TO_RADIANS;
 
