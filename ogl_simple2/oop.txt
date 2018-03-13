@@ -1,0 +1,62 @@
+
+Vec3 v_norm(Vec3 v){
+    float l=sqrt(
+        (v.x*v.x) +
+        (v.y*v.y) +
+        (v.z*v.z)
+    );
+	 Vec3 nv;
+	nv.x=v.x/l;
+	nv.y=v.y/l;
+	nv.z=v.z/l;
+	return nv;
+}
+
+float v_dot( Vec3 v1, Vec3 v2){  
+   Vec3 v1n=v_norm(v1); 
+   Vec3 v2n=v_norm(v2); 
+  return v1n.x * v2n.x + v1n.y * v2n.y + v1n.z * v2n.z; 
+}
+
+Vec3 v_cross( Vec3 a, Vec3 b){
+        Vec3 v;
+        v.x=(a.y*b.z) - (a.z*b.y);
+        v.y= (a.z*b.x) - (a.x*b.z);
+        v.z= (a.x*b.y) -(a.y*b.x);
+        return v;
+}
+
+Vec3 v_mult_s( Vec3 v,float m){
+     Vec3 vf;
+    vf.x=v.x*m;
+    vf.y=v.y*m;
+    vf.z=v.z*m;
+    return vf;
+}
+
+Vec3 rotate_vector_by_quaternion(Vec3 v, Quat q){
+    Vec3 u(q.x, q.y, q.z);
+    float s = q.w;
+    float vprime = 2.0f * v_dot(u, v) * u + (s*s - v_dot(u, u)) * v + 2.0f * s;
+    Vec3 v_cross=v_cross(u, v);
+
+  return v_mult_s(v_cross,prime);
+}
+
+float v_dot( Vec3 v1, Vec3 v2);               
+Vec3 v_cross( Vec3 a, Vec3 b);
+Vec3 v_mult_s( Vec3 v,float m);
+Vec3 rotate_vector_by_quaternion(Vec3 v, Quat q);
+
+
+    //forward vector:
+    Vec3 f_vec; 
+    f_vec.x = 0;
+    f_vec.y = 0;
+    f_vec.z = 1;
+
+	Vec3 ff_vec=rotate_vector_by_quaternion(f_vec,ooo);
+	fprintf(stderr, " pitch accel x,y,z: %f, %f, %f \n",ff_vec.x,ff_vec.y,ff_vec.z);
+
+
+

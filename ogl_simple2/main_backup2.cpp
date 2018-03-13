@@ -30,6 +30,8 @@
 //#include <glm/gtc/matrix_transform.hpp>
 //#include <glm/gtx/quaternion.hpp>
 
+
+
 typedef struct {
     float x,y,z;
 } Vec3;
@@ -38,6 +40,50 @@ typedef struct {
 typedef struct {
     float m[16];
 } Mat4;
+
+typedef struct {                                                                              
+    float x=0;
+	float y=0;
+	float z=0;
+	float w=1;
+} Quat;
+
+void updateQuatByRotation(Quat *q, Vec3 *v);
+void quat_mul(Quat *q1,Quat *q2,Quat *r);
+void quatToMatrix(Quat q_bad,Mat4 *m);
+void toEulerAngle(Quat& q, double &roll, double &pitch, double &yaw);
+void toQuaternion(Quat& q, double roll, double pitch,double yaw);
+void invert(Mat4 *m);
+
+float v_dot( Vec3 v1, Vec3 v2);               
+Vec3 v_cross( Vec3 a, Vec3 b);
+Vec3 v_mult_s( Vec3 v,float m);
+Vec3 rotate_vector_by_quaternion(Vec3 v, Quat q);
+
+
+void updateQuatByRotation(Quat *q, Vec3 *v){
+
+        Quat w,r;
+        w.w=0;                                                                                
+        w.x=v->x;                                                                         
+        w.y=v->y;                                                                         
+        w.z=v->z;                                                                        
+		
+        quat_mul(q,&w,&r);
+        q->w += r.w * 0.5;                                                    
+        q->x += r.x * 0.5;                                                    
+        q->y += r.y * 0.5;                                                    
+        q->z += r.z * 0.5;                                                    
+}
+
+
+void quat_mul(Quat *q1,Quat *q2,Quat *r){
+    r->w = (q1->w*q2->w - q1->x*q2->x - q1->y*q2->y - q1->z*q2->z);
+    r->x = (q1->w*q2->x + q1->x*q2->w + q1->y*q2->z - q1->z*q2->y);
+    r->y = (q1->w*q2->y - q1->x*q2->z + q1->y*q2->w + q1->z*q2->x);
+    r->z = (q1->w*q2->z + q1->x*q2->y - q1->y*q2->x + q1->z*q2->w);
+}
+
 
 //I still dont understand this...
 void getProjectionMatrix( Mat4 *m,float angleOfView,float imageAspectRatio, float zMin, float zMax)
@@ -65,8 +111,9 @@ void getProjectionMatrix( Mat4 *m,float angleOfView,float imageAspectRatio, floa
 }
 
 //This is where the camera is... Its like opposite of Model I think... ie we remove the world around the camera
-void getViewMatrix(Mat4 *m){
 
+//if we invert this then it is where we are
+void getViewMatrix(Mat4 *m){
 	m->m[0]=1;
 	m->m[1]=0;
     m->m[2]=0;
@@ -81,22 +128,21 @@ void getViewMatrix(Mat4 *m){
     m->m[9]=0;
     m->m[10]=1;
     m->m[11]=0; 
-
+	
+	//This is like camera position mmmk
 	m->m[12]=0; //x
-    m->m[13]=0;//y
+    m->m[13]=5;//y
     m->m[14]=20;//z
     m->m[15]=1;
-
-////m->m[12]=0;//x, 
-////m->m[13]=2;//y,
-////m->m[14]=-20;//z
-////m->m[15]=1;
-}
-
-void getRotationtrix(Mat4 *m,float x,float y,float z){
-
+	
+   //and we flip
+   m->m[12]*=-1;
+   m->m[13]*=-1;
+   m->m[14]*=-1;
 
 }
+
+
 
 
 void getIdentityMatrix(Mat4 *r){
@@ -150,6 +196,10 @@ void print_matrix(Mat4 *a){
 		fprintf(stderr, "%f %f %f %f \n",a->m[12],a->m[13],a->m[14],a->m[15]);
 }
 
+void print_quat(Quat *q){
+		fprintf(stderr, "%f %f %f %f \n",q->w,q->x,q->y,q->z);
+}
+
 
 //HHEADER declrations
 void computeMatricesFromInputs();
@@ -162,228 +212,14 @@ GLFWwindow* window;
 ////glm::quat currentOrientation;
 Mat4 View;
 Mat4 Model;
+Mat4 Rotation;
 Mat4 Projection;
 Mat4 MVP;
-
 Vec3 gyro;
+Quat ooo;
+Quat a_ooo;
 
-
-int video_fildes,video_fildes2;
-float a_pitch_final,a_roll_final;
-int16_t ax, ay, az;
-int16_t gx, gy, gz;
-//glm::vec3 velocity;
-int dt; //in microseconds
-float delta_seconds;
-MPU6050 accelgyro;
-float DEGREES_TO_RADIANS=0.01745329251; //multiplier PI/180
-float GYRO_DPS =65.5;//https://cdn.sparkfun.com/assets/learn_tutorials/5/5/0/MPU9250REV1.0.pdf
-
-
-
-
-
-
-
-//glm::vec3 position = glm::vec3( 0, 0, 10 ); 
-float horizontalAngle = 3.14f;
-float verticalAngle = 0.0f;
-float initialFoV = 45.0f;
-float speed = 3.0f; // 3 units / second
-float mouseSpeed = 0.005f;
-
-
-
-
-
-
-/// void get_camera_data(){
-///   fd_set fds;
-///   fd_set fds2;
-///   struct v4l2_buffer buf;
-///   struct v4l2_buffer buf2;
-
-///     int ret;
-///     int ret2;
-
-///     FD_ZERO(&fds);
-///     FD_SET(video_fildes, &fds);
-
-///     FD_ZERO(&fds2);
-///     FD_SET(video_fildes2, &fds2);
-
-///     struct timeval tv = {.tv_sec = 5, .tv_usec = 0};
-///     ret = select(video_fildes + 1, &fds, NULL, NULL, &tv);
-///     ret2 = select(video_fildes2 + 1, &fds2, NULL, NULL, &tv);
-
-
-///     //camera 1
-///     if (FD_ISSET(video_fildes, &fds)) {
-///       memset(&buf, 0, sizeof(buf));
-///       buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-///       buf.memory = V4L2_MEMORY_MMAP;
-///       ioctl(video_fildes, VIDIOC_DQBUF, &buf);
-
-///       v4lconvert_yuyv_to_rgb24((unsigned char *) v4l2_ubuffers[buf.index].start, data_buffer1);
-
-///       buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-///       buf.memory = V4L2_MEMORY_MMAP;
-///       ioctl(video_fildes, VIDIOC_QBUF, &buf);
-///     }
-
-/// //camera 2
-///     if (FD_ISSET(video_fildes2, &fds2)) {
-///       memset(&buf2, 0, sizeof(buf2));
-///       buf2.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-///       buf2.memory = V4L2_MEMORY_MMAP;
-///       ioctl(video_fildes2, VIDIOC_DQBUF, &buf2);
-
-///       v4lconvert_yuyv_to_rgb24((unsigned char *) v4l2_ubuffers2[buf2.index].start, data_buffer2);
-
-///       buf2.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-///       buf2.memory = V4L2_MEMORY_MMAP;
-///       ioctl(video_fildes2, VIDIOC_QBUF, &buf2);
-///     }
-
-///     compare_images();
-
-/// }
-
-//  void start_cameras(){
-
-//    int format= V4L2_PIX_FMT_YUYV;
-
-//    //video1
-//    const char *device = "/dev/video0";
-//    video_fildes = v4l2_open(device);
-//    v4l2_querycap(video_fildes, device);
-//    v4l2_sfmt(video_fildes, format);
-//    v4l2_gfmt(video_fildes);
-//    v4l2_sfps(video_fildes, 20);
-//    v4l2_mmap(video_fildes);
-//    v4l2_streamon(video_fildes);
-
-
-//    //video2
-//    const char *device2 = "/dev/video1";
-//     video_fildes2 = v4l2_open(device2);
-//    v4l2_querycap(video_fildes2, device2);
-//    v4l2_sfmt(video_fildes2, format);
-//    v4l2_gfmt(video_fildes2);
-//    v4l2_sfps(video_fildes2, 20);
-//    v4l2_mmap2(video_fildes2);
-//    v4l2_streamon(video_fildes2);
-
-//  }
-
-
-
-
-int main( void )
-{
-
-
-
-    int zoom =1;
-    //currentOrientation=glm::quat(glm::vec3(0,0,0));
-    getProjectionMatrix(&Projection, 40+(zoom*2), 1, .1, 1000);
-    getIdentityMatrix(&Model);        
-    getViewMatrix(&View);     
-
-    std::thread t1(updateGyroPositionThead);//crank of the new thread
-    //start_cameras();
-
-    glfwInit() ;//no eror
-	glfwWindowHint(GLFW_SAMPLES, 4);
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-	glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE); // To make MacOS happy; should not be needed
-	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE); //We don't want the old OpenGL 
-
-	window = glfwCreateWindow( 1024, 768, "Tutorial 03 - Matrices", NULL, NULL); //no error
-	glfwMakeContextCurrent(window);
-	glewExperimental = true; // Needed for core profile
-    glewInit();//forget error
-
-	// Ensure we can capture the escape key being pressed below
-	glfwSetInputMode(window, GLFW_STICKY_KEYS, GL_TRUE);
-
-	// Dark blue background
-	glClearColor(0.0f, 0.0f, 0.4f, 0.0f);
-	GLuint VertexArrayID;
-	glGenVertexArrays(1, &VertexArrayID);
-	glBindVertexArray(VertexArrayID);
-
-	// Create and compile our GLSL program from the shaders
-	GLuint programID = LoadShaders( "SimpleTransform.vertexshader", "SingleColor.fragmentshader" );
-	// Get a handle for our "MVP" uniform
-	GLuint MatrixID = glGetUniformLocation(programID, "MVP");
-	
-    //GLfloat g_vertex_buffer_data[1000000] = {0.0};
-    GLuint vertexbuffer;
-    glGenBuffers(1, &vertexbuffer);
-    glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
-    GLfloat g_vertex_buffer_data[] = { 
-        //rect front
-    -4.0f,0.5f,2.0f, 
-    4.0f,-0.5f,2.0f, 
-    -4.0f, -0.5f,2.0f,
-    -4.0f,0.5f,2.0f, 
-    4.0f,0.5f,2.0f,
-    4.0f, -0.5f,2.0f,
-    //rect right side
-    4.0f,0.5f,2.0f, 
-    4.0f,-0.5f,-2.0f,
-    4.0f, -0.5f,2.0f,
-    4.0f,0.5f,2.0f, 
-    4.0f,0.5f,-2.0f,
-    4.0f, -0.5f,-2.0f,
-    //rect left side
-    -4.0f,0.5f,2.0f, 
-    -4.0f,-0.5f,-2.0f,
-    -4.0f, -0.5f,2.0f,
-    -4.0f,0.5f,2.0f, 
-    -4.0f,0.5f,-2.0f,
-    -4.0f, -0.5f,-2.0f,
-    //rect back
-    -4.0f,0.5f,-2.0f, 
-    4.0f,-0.5f,-2.0f,
-    -4.0f, -0.5f,-2.0f,
-    -4.0f,0.5f,-2.0f, 
-    4.0f,0.5f,-2.0f,
-    4.0f, -0.5f,-2.0f,
-    //rect bottom
-    -4.0f,-0.5f,2.0f, 
-    4.0f,-0.5f,2.0f,
-    4.0f, -0.5f,-2.0f,
-    -4.0f,-0.5f,2.0f, 
-    4.0f,-0.5f,-2.0f,
-    -4.0f, -0.5f,-2.0f,
-    //rect top
-    -4.0f,0.5f,2.0f, 
-    4.0f,0.5f,2.0f,
-    4.0f, 0.5f,-2.0f,
-    -4.0f,0.5f,2.0f, 
-    4.0f,0.5f,-2.0f,
-    -4.0f, 0.5f,-2.0f,
-
-    //forward triange
- // 3.0f,1.0f,-4.0f, 
- // 5.0f,1.0f,-4.0f,
- // 4.0f,1.0f,-7.0f,
-	};
-
-    glBufferData(GL_ARRAY_BUFFER, sizeof(g_vertex_buffer_data), g_vertex_buffer_data, GL_STATIC_DRAW);
-	do{
-//        get_camera_data();
-
-
-		//its closer to 45
-		//400 / 10 = 40
-		//  for (x = 0; x < (image_1_edge_match_count_total * 3); x += 3) {
-		//          //x is actually y (and its backwords)
-		//          //y is actually x
-		//          //fprintf(stderr, " pos: %f \n",final_image_pos[x+0]);
+printf(stderr, " pos: %f \n",final_image_pos[x+0]);
 		//          g_vertex_buffer_data[x]  = (GLfloat)  final_image_pos[x+1]/100;
 		//          g_vertex_buffer_data[x+1] = 4 - (GLfloat)  final_image_pos[x+0]/100;
 		//          g_vertex_buffer_data[x+2] = - (GLfloat) final_image_pos[x+2] /100;//this is depth
@@ -392,9 +228,18 @@ int main( void )
 
     glClear(GL_COLOR_BUFFER_BIT);
     glUseProgram(programID);
-
+	
     //computeMatricesFromInputs();
-    matrix_product(&Model,&View,&MVP);
+	//Update Model by Rotation
+	quatToMatrix(ooo,&Rotation);
+
+////Mat4 t;
+////getIdentityMatrix(&t);      
+//matrix_product(&Rotation,&t,&Model);
+
+	//print_matrix(&Rotation);
+
+    matrix_product(&Rotation,&View,&MVP);
     matrix_product(&MVP,&Projection,&MVP);
 
  // Send our transformation to the currently bound shader, 
@@ -440,52 +285,82 @@ return 0;
 
 void updateGyroPositionThead(){
 
-
  fprintf(stderr, " I am my own thread \n");
  accelgyro.initialize();//init accel/gyro
 	auto this_time = std::chrono::high_resolution_clock::now();
 	auto last_time = std::chrono::high_resolution_clock::now();
   int i=0;
   do{
+
+  usleep(10000);
   i++;
   this_time = std::chrono::high_resolution_clock::now();
   auto dt = std::chrono::duration_cast<std::chrono::microseconds>(this_time - last_time).count();
   last_time = std::chrono::high_resolution_clock::now();
 
   accelgyro.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
-  delta_seconds=dt/1000000;
+
+  delta_seconds= ((float) dt) / 1000000;
 
 //this is distance moved vector
 //x,y,z ar different than acell
-   gyro.x=(-gy/GYRO_DPS) * DEGREES_TO_RADIANS * delta_seconds; //this is pitch
-   gyro.y=(gz/GYRO_DPS) * DEGREES_TO_RADIANS * delta_seconds; //this moves  yaw (z apparently)
-   gyro.z=(-gx/GYRO_DPS) * DEGREES_TO_RADIANS * delta_seconds;//roll
+// gyro.x= (gy/GYRO_DPS) * DEGREES_TO_RADIANS * delta_seconds; //this is pitch
+// gyro.y=(-gz/GYRO_DPS) * DEGREES_TO_RADIANS * delta_seconds; //this moves  yaw (z apparently)
+// gyro.z= (-gx/GYRO_DPS) * DEGREES_TO_RADIANS * delta_seconds;//roll
+
+ gyro.x=(-gx/GYRO_DPS) * DEGREES_TO_RADIANS * delta_seconds;//roll
+ gyro.y=(-gy/GYRO_DPS) * DEGREES_TO_RADIANS * delta_seconds; //pitch
+ gyro.z=(gz/GYRO_DPS) * DEGREES_TO_RADIANS * delta_seconds;//yaw
+
+  updateQuatByRotation(&ooo,&gyro); 
+  toEulerAngle(ooo,roll,pitch,yaw);
 
 
-////  glm::quat gyroQuat = glm::quat(gyro);
+	float acc_total_vector = sqrt((ax*ax)+(ay*ay)+(az*az));
+	if(abs(ax) < acc_total_vector){
+		 a_pitch_final = asin((float)ax/acc_total_vector);
+	}
+	if(abs(ay) < acc_total_vector){
+		 a_roll_final = -asin((float)ay/acc_total_vector);
+	}
 
-////  currentOrientation = currentOrientation * gyroQuat;//here we update by gyro rotation
+////double gyro_yaw,gyro_pitch,gyro_roll; 
 
-////  float acc_total_vector = sqrt((ax*ax)+(ay*ay)+(az*az));
-////  if(abs(ax) < acc_total_vector){
-////	   a_pitch_final = -asin((float)ax/acc_total_vector);
-////  }
-////  if(abs(ay) < acc_total_vector){
-////	   a_roll_final = asin((float)ay/acc_total_vector);
-////  }
+	//fprintf(stderr, " pitch: %f \n,  ",gyro_roll/0.0174);
+	//fprintf(stderr, " pitch: %f,  ",gyro_pitch/0.0174);
+	//fprintf(stderr, " yaw: %f \n",gyro_yaw/0.0174);
+		
+	
+	Vec3 accell_correction;
+	accell_correction.x=(a_roll_final-roll) * 5 * delta_seconds;
+	accell_correction.y=(a_pitch_final-pitch) * 5 * delta_seconds ;
+	accell_correction.z=0;//(a_roll_final-gyro_roll) * .02;
 
-//// glm::vec3 gyroEuler = glm::eulerAngles(currentOrientation); 	
+    updateQuatByRotation(&ooo,&accell_correction); 
 
-////	//complimentary filter for accell data
-////	glm::vec3 accell( -a_pitch_final, -gyroEuler.y,  -a_roll_final);
-////	glm::vec3 acell_gyro_delta( accell.x-gyroEuler.x, 0, accell.z-gyroEuler.z);
-////	acell_gyro_delta*= 0.02f;
-////	glm::quat accelcorrectionQuat = glm::quat(acell_gyro_delta);
-////	currentOrientation*=accelcorrectionQuat;
-////		
+    //forward vector:
+    Vec3 f_vec; 
+    f_vec.x = 0;
+    f_vec.y = 0;
+    f_vec.z = 1;
 
+	Vec3 ff_vec=rotate_vector_by_quaternion(f_vec,ooo);
+	fprintf(stderr, " pitch accel x,y,z: %f, %f, %f \n",ff_vec.x,ff_vec.y,ff_vec.z);
+
+    
+    //up vector
+//  x = 2 * (x*y - w*z)
+//  y = 1 - 2 * (x*x + z*z)
+//  z = 2 * (y*z + w*x)
+//  
+//  //left vector
+//  x = 1 - 2 * (y*y + z*z)
+//  y = 2 * (x*y + w*z)
+//  z = 2 * (x*z - w*y)
+
+	
 ////	  //add in the moving of accell 
-////	  vec3 acceleration=vec3(0,az,0); //az is up/down
+//	  vec3 acceleration=vec3(0,az,0); //az is up/down
 
 ////	  //current accelleration is in m/second //mm, second
 ////	  acceleration*= 0.023809523f ;//scale this junk
@@ -635,7 +510,6 @@ GLuint LoadShaders(const char * vertex_file_path,const char * fragment_file_path
 	}
 
 
-
 	// Compile Fragment Shader
 	printf("Compiling shader : %s\n", fragment_file_path);
 	char const * FragmentSourcePointer = FragmentShaderCode.c_str();
@@ -678,88 +552,170 @@ GLuint LoadShaders(const char * vertex_file_path,const char * fragment_file_path
 	return ProgramID;
 }
 
-void getRotateMatrix(float x,float y, float z ,Mat4 *m){
+void quatToMatrix(Quat q_bad,Mat4 *m){
+	//I want x to be roll
 
+	Quat q;
+	q.x=q_bad.y;
+	q.y=q_bad.z;//
+	q.z=q_bad.x;
 
-   Mat4 m1;
-   getRotateXMatrix(x,&m1); 
-   Mat4 m2;
-   getRotateYMatrix(y,&m2); 
-   matrix_product(&m1,&m2,&m)
+	float wx, wy, wz, xx, yy, yz, xy, xz, zz, x2, y2, z2;
+	x2 = q.x + q.x;
+    y2 = q.y + q.y;
+    z2 = q.z + q.z;
 
+	xx = q.x * x2;
+    xy = q.x * y2;
+    xz = q.x * z2;
 
+	yy = q.y * y2;
+    yz = q.y * z2;
+    zz = q.z * z2;
+	wx = q.w * x2;
+    wy = q.w * y2;
+    wz = q.w * z2;
 
+////_1_1 = 1.0f-(yy + zz); 
+////_1_2 = xy + wz;
+////_1_3 = xz - wy;
+////_1_4 = 0;
+
+////_2_1 = xy - wz;    
+////_2_2 = 1.0f-(xx + zz);
+////_2_3 = yz + wx;  
+////_2_4 = 0;
+
+////_3_1 = xz + wy;  
+////_3_2 = yz - wx;  
+////_3_3 = 1.0f-(xx + yy);
+////_3_4 = 0;
+
+////_4_1 = 0.0;
+////_4_2 = 0.0;    
+////_4_3 = 0.0;    
+////_4_4 = 1;
+
+ m->m[0] =1.0f-(yy + zz); 
+ m->m[1] = xy + wz; 
+ m->m[2] = xz - wy; 
+ m->m[3]= 0;
+		 
+ m->m[4] = xy - wz;
+ m->m[5] = 1.0f-(xx + zz); 
+ m->m[6] = yz + wx;   
+ m->m[7] = 0;
+		 
+ m->m[8] = xz + wy;  
+ m->m[9] = yz - wx;  
+ m->m[10]= 1.0f-(xx + yy);
+ m->m[11] = 0;
+		 
+ m->m[12] =0;
+ m->m[13] =0;
+ m->m[14] =0;
+ m->m[15] =1;
+
+////m->m[0] =1.0f-(yy + zz); 
+////m->m[4] = xy + wz; 
+////m->m[8] = xz - wy; 
+////m->m[12]= 0;
+////	 
+////m->m[1] = xy - wz;
+////m->m[5] = 1.0f-(xx + zz); 
+////m->m[9] =  yz + wx;   
+////m->m[13] = 0;
+////	 
+////m->m[2] = xz + wy;  
+////m->m[6] = yz - wx;  
+////m->m[10]= 1.0f-(xx + yy);
+////m->m[14] = 0;
+////	 
+////m->m[3] =0;
+////m->m[7] =0;
+////m->m[11] =0;
+////m->m[15] =1;
 
 
 }
 
-void getRotateXMatrix(float angle,Mat4 *m){
-    float a=angle * (M_PI /180);
-	m[0]=1;
-	m[1]=0;
-    m[2]=0;
-    m[3]=0;
+void toEulerAngle(Quat &q, double &roll, double &pitch, double &yaw)
+{
+	// roll (x-axis rotation)
+	double sinr = +2.0 * (q.w * q.x + q.y * q.z);
+	double cosr = +1.0 - 2.0 * (q.x * q.x + q.y * q.y);
+	roll = atan2(sinr, cosr);
 
-    m[4]=0;
-    m[5]=cos(a); 
-    m[6]= sin(a); 
-    m[7]=0; 
-
-    m[8]=0;
-    m[9]=-sin(a);
-    m[10]=cos(a);
-    m[11]=0;
-
-	m[12]=0;
-	m[13]=0; 
-	m[14]=0; 
-	m[15]=1;
+	// pitch (y-axis rotation)
+	double sinp = +2.0 * (q.w* q.y - q.z * q.x);
+        if (fabs(sinp) >= 1)
+            pitch = copysign(M_PI / 2, sinp); // use 90 degrees if out of range
+        else
+	    pitch = asin(sinp);
+	// yaw (z-axis rotation)
+	double siny = +2.0 * (q.w * q.z + q.x * q.y);
+	double cosy = +1.0 - 2.0 * (q.y * q.y + q.z * q.z);  
+	yaw = atan2(siny, cosy);
 }
 
-void getRotateYMatrix(float angle,Mat4 *m){
-    float a=angle * (M_PI /180);
-	m[0]=cos(a);
-	m[1]=0;
-    m[2]=-sin(a);
-    m[3]=0;
+void toQuaternion(Quat& q, double roll, double pitch,double yaw)
+{
+        // Abbreviations for the various angular functions
+	double cy = cos(yaw * 0.5);
+	double sy = sin(yaw * 0.5);
+	double cr = cos(roll * 0.5);
+	double sr = sin(roll * 0.5);
+	double cp = cos(pitch * 0.5);
+	double sp = sin(pitch * 0.5);
 
-    m[4]=0;
-    m[5]=1;
-    m[6]=0;
-    m[7]=0; 
-
-    m[8]=sin(a);
-    m[9]=0;
-    m[10]=cos(a)
-    m[11]=0;
-
-	m[12]=0;
-	m[13]=0; 
-	m[14]=0; 
-	m[15]=1;
+	q.w = cy * cr * cp + sy * sr * sp;
+	q.x = cy * sr * cp - sy * cr * sp;
+	q.y = cy * cr * sp + sy * sr * cp;
+	q.z = sy * cr * cp - cy * sr * sp;
 }
 
-void getRotateZMatrix(float angle,Mat4 *m){
-    float a=angle * (M_PI /180);
-	m[0]=cos(a);
-	m[1]=sin(a)
-    m[2]=0;
-    m[3]=0;
 
-    m[4]=-sin(a)
-    m[5]=cos(a);
-    m[6]=0;
-    m[7]=0; 
-
-    m[8]=0;
-    m[9]=0;
-    m[10]=1;
-    m[11]=0;
-
-	m[12]=0;
-	m[13]=0; 
-	m[14]=0; 
-	m[15]=1;
+Vec3 v_norm(Vec3 v){
+    float l=sqrt(
+        (v.x*v.x) +
+        (v.y*v.y) +
+        (v.z*v.z)
+    );
+	 Vec3 nv;
+	nv.x=v.x/l;
+	nv.y=v.y/l;
+	nv.z=v.z/l;
+	return nv;
 }
 
+float v_dot( Vec3 v1, Vec3 v2){  
+   Vec3 v1n=v_norm(v1); 
+   Vec3 v2n=v_norm(v2); 
+  return v1n.x * v2n.x + v1n.y * v2n.y + v1n.z * v2n.z; 
+}
+
+Vec3 v_cross( Vec3 a, Vec3 b){
+        Vec3 v;
+        v.x=(a.y*b.z) - (a.z*b.y);
+        v.y= (a.z*b.x) - (a.x*b.z);
+        v.z= (a.x*b.y) -(a.y*b.x);
+        return v;
+}
+
+Vec3 v_mult_s( Vec3 v,float m){
+     Vec3 vf;
+    vf.x=v.x*m;
+    vf.y=v.y*m;
+    vf.z=v.z*m;
+    return vf;
+}
+
+Vec3 rotate_vector_by_quaternion(Vec3 v, Quat q){
+    Vec3 u(q.x, q.y, q.z);
+    float s = q.w;
+    float vprime = 2.0f * v_dot(u, v) * u + (s*s - v_dot(u, u)) * v + 2.0f * s;
+    Vec3 v_cross=v_cross(u, v);
+
+  return v_mult_s(v_cross,prime);
+}
 

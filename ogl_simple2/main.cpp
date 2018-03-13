@@ -54,6 +54,15 @@ void quatToMatrix(Quat q_bad,Mat4 *m);
 void toEulerAngle(Quat& q, double &roll, double &pitch, double &yaw);
 void toQuaternion(Quat& q, double roll, double pitch,double yaw);
 void invert(Mat4 *m);
+float v_dot( Vec3 v1, Vec3 v2);               
+Vec3 v_cross( Vec3 a, Vec3 b);
+Vec3 v_mult_s( Vec3 v,float m);
+Vec3 rotate_vector_by_quaternion(Vec3 v, Quat q);
+void mat_mult_v(Mat4 m,Vec3 v1,Vec3 *r);
+
+void quat_norm(Quat *q);
+
+
 
 void updateQuatByRotation(Quat *q, Vec3 *v){
 
@@ -62,15 +71,39 @@ void updateQuatByRotation(Quat *q, Vec3 *v){
         w.x=v->x;                                                                         
         w.y=v->y;                                                                         
         w.z=v->z;                                                                        
-		
         quat_mul(q,&w,&r);
         q->w += r.w * 0.5;                                                    
         q->x += r.x * 0.5;                                                    
         q->y += r.y * 0.5;                                                    
         q->z += r.z * 0.5;                                                    
+        //maybye
+        quat_norm(q);
 }
 
+void quat_norm(Quat *q){
+ float d= (q->w*q->w) + (q->x*q->x) + (q->y*q->y) + (q->z*q->z);
+ 	
+ if(d==0){
+     q->w = 1;
+     q->x = 0;
+     q->y = 0;
+     q->z = 0;
+	return;
+ }
 
+ float m  = sqrt(d);
+ q->w = q->w / m;
+ q->x = q->x / m;
+ q->y = q->y / m;
+ q->z = q->z / m ; 
+
+}
+
+void mat_mult_v(Mat4 m,Vec3 v1,Vec3 *r){
+    r->x= m.m[0]*v1.x + m.m[1]*v1.y + m.m[2]*v1.z;
+    r->y= m.m[4]*v1.x + m.m[5]*v1.y + m.m[6]*v1.z;
+    r->z= m.m[8]*v1.x + m.m[9]*v1.y + m.m[10]*v1.z;
+} 
 void quat_mul(Quat *q1,Quat *q2,Quat *r){
     r->w = (q1->w*q2->w - q1->x*q2->x - q1->y*q2->y - q1->z*q2->z);
     r->x = (q1->w*q2->x + q1->x*q2->w + q1->y*q2->z - q1->z*q2->y);
@@ -444,7 +477,7 @@ int main( void )
 	
     //computeMatricesFromInputs();
 	//Update Model by Rotation
-	quatToMatrix(ooo,&Rotation);
+	//quatToMatrix(ooo,&Rotation);
 
 ////Mat4 t;
 ////getIdentityMatrix(&t);      
@@ -551,12 +584,22 @@ void updateGyroPositionThead(){
 	accell_correction.z=0;//(a_roll_final-gyro_roll) * .02;
 
     updateQuatByRotation(&ooo,&accell_correction); 
-	
-////	  //add in the moving of accell 
-//	  vec3 acceleration=vec3(0,az,0); //az is up/down
 
-////	  //current accelleration is in m/second //mm, second
-////	  acceleration*= 0.023809523f ;//scale this junk
+
+	//Vec3 ff_vec=rotate_vector_by_quaternion(f_vec,ooo);
+
+	quatToMatrix(ooo,&Rotation);
+    //forward vector:
+    Vec3 f_vec; 
+    f_vec.x = 0;
+    f_vec.y = 0;
+    f_vec.z = 1;
+    Vec3 ff_vec;
+    mat_mult_v(Rotation,f_vec,&ff_vec);
+
+	fprintf(stderr, " pitch accel x,y,z: %f, %f, %f \n",ff_vec.x,ff_vec.y,ff_vec.z);
+
+	
 
 ////	  velocity=(velocity)+(acceleration * delta_seconds);
 
@@ -747,79 +790,86 @@ GLuint LoadShaders(const char * vertex_file_path,const char * fragment_file_path
 }
 
 void quatToMatrix(Quat q_bad,Mat4 *m){
+    
 	//I want x to be roll
+	quat_norm(&q_bad);
 
 	Quat q;
 	q.x=q_bad.y;
 	q.y=q_bad.z;//
 	q.z=q_bad.x;
+	
+float x=q.x;
+float y=q.y;
+float z=q.z;
+float w=q.w;
 
-	float wx, wy, wz, xx, yy, yz, xy, xz, zz, x2, y2, z2;
-	x2 = q.x + q.x;	y2 = q.y + q.y;	z2 = q.z + q.z;
-	xx = q.x * x2;	xy = q.x * y2;	xz = q.x * z2;
-	yy = q.y * y2;	yz = q.y * z2;	zz = q.z * z2;
-	wx = q.w * x2;	wy = q.w * y2;	wz = q.w * z2;
+////float wx, wy, wz, xx, yy, yz, xy, xz, zz, x2, y2, z2;
+////x2 = q.x + q.x;
+////y2 = q.y + q.y;
+////z2 = q.z + q.z;
+////xx = q.x * x2;
+////xy = q.x * y2;
+////xz = q.x * z2;
+////yy = q.y * y2;
+////yz = q.y * z2;
+////zz = q.z * z2;
+////wx = q.w * x2;
+////wy = q.w * y2;	
+////wz = q.w * z2;
 
-////_1_1 = 1.0f-(yy + zz); 
-////_1_2 = xy + wz;
-////_1_3 = xz - wy;
-////_1_4 = 0;
+////R = [
+////1 - 2*y*y - 2*z*z,
+////2*x*y - 2*z*w, 
+////2*x*z + 2*y*w;
 
-////_2_1 = xy - wz;    
-////_2_2 = 1.0f-(xx + zz);
-////_2_3 = yz + wx;  
-////_2_4 = 0;
+////2*x*y + 2*z*w,
+////1 - 2*x*x - 2*z*z,
+////2*y*z - 2*x*w;
 
-////_3_1 = xz + wy;  
-////_3_2 = yz - wx;  
-////_3_3 = 1.0f-(xx + yy);
-////_3_4 = 0;
+////2*x*z - 2*y*w,
+////2*y*z + 2*x*w,
+////1 - 2*x*x - 2*y*y
 
-////_4_1 = 0.0;
-////_4_2 = 0.0;    
-////_4_3 = 0.0;    
-////_4_4 = 1;
+//// ];
 
- m->m[0] =1.0f-(yy + zz); 
- m->m[1] = xy + wz; 
- m->m[2] = xz - wy; 
- m->m[3]= 0;
-		 
- m->m[4] = xy - wz;
- m->m[5] = 1.0f-(xx + zz); 
- m->m[6] = yz + wx;   
- m->m[7] = 0;
-		 
- m->m[8] = xz + wy;  
- m->m[9] = yz - wx;  
- m->m[10]= 1.0f-(xx + yy);
- m->m[11] = 0;
-		 
- m->m[12] =0;
- m->m[13] =0;
- m->m[14] =0;
- m->m[15] =1;
+  m->m[0] =1 - 2*y*y - 2*z*z;
+  m->m[1] = 2*x*y - 2*z*w ; 
+  m->m[2] = 2*x*z + 2*y*w; 
+  m->m[3]= 0;
+  m->m[4] = 2*x*y + 2*z*w ;
+  m->m[5] = 1 - 2*x*x - 2*z*z; 
+  m->m[6] = 2*y*z - 2*x*w;    
+  m->m[7] = 0;
+  m->m[8] = 2*x*z - 2*y*w;  
+  m->m[9] = 2*y*z + 2*x*w;  
+  m->m[10]= 1 - 2*x*x - 2*y*y;
+  m->m[11] = 0;
+  m->m[12] =0;
+  m->m[13] =0;
+  m->m[14] =0;
+  m->m[15] =1;
 
-////m->m[0] =1.0f-(yy + zz); 
-////m->m[4] = xy + wz; 
-////m->m[8] = xz - wy; 
-////m->m[12]= 0;
-////	 
-////m->m[1] = xy - wz;
-////m->m[5] = 1.0f-(xx + zz); 
-////m->m[9] =  yz + wx;   
-////m->m[13] = 0;
-////	 
-////m->m[2] = xz + wy;  
-////m->m[6] = yz - wx;  
-////m->m[10]= 1.0f-(xx + yy);
-////m->m[14] = 0;
-////	 
-////m->m[3] =0;
-////m->m[7] =0;
-////m->m[11] =0;
-////m->m[15] =1;
 
+//  m->m[0] =1.0f-(yy + zz); 
+//  m->m[1] = xy + wz; 
+//  m->m[2] = xz - wy; 
+//  m->m[3]= 0;
+//          
+//  m->m[4] = xy - wz;
+//  m->m[5] = 1.0f-(xx + zz); 
+//  m->m[6] = yz + wx;   
+//  m->m[7] = 0;
+//          
+//  m->m[8] = xz + wy;  
+//  m->m[9] = yz - wx;  
+//  m->m[10]= 1.0f-(xx + yy);
+//  m->m[11] = 0;
+//          
+//  m->m[12] =0;
+//  m->m[13] =0;
+//  m->m[14] =0;
+//  m->m[15] =1;
 
 }
 
@@ -857,3 +907,39 @@ void toQuaternion(Quat& q, double roll, double pitch,double yaw)
 	q.y = cy * cr * sp + sy * sr * cp;
 	q.z = sy * cr * cp - cy * sr * sp;
 }
+
+Vec3 v_norm(Vec3 v){
+    float l=sqrt(
+        (v.x*v.x) +
+        (v.y*v.y) +
+        (v.z*v.z)
+    );
+	 Vec3 nv;
+	nv.x=v.x/l;
+	nv.y=v.y/l;
+	nv.z=v.z/l;
+	return nv;
+}
+
+float v_dot( Vec3 v1, Vec3 v2){  
+   Vec3 v1n=v_norm(v1); 
+   Vec3 v2n=v_norm(v2); 
+  return v1n.x * v2n.x + v1n.y * v2n.y + v1n.z * v2n.z; 
+}
+
+Vec3 v_cross( Vec3 a, Vec3 b){
+        Vec3 v;
+        v.x=(a.y*b.z) - (a.z*b.y);
+        v.y= (a.z*b.x) - (a.x*b.z);
+        v.z= (a.x*b.y) -(a.y*b.x);
+        return v;
+}
+
+Vec3 v_mult_s( Vec3 v,float m){
+     Vec3 vf;
+    vf.x=v.x*m;
+    vf.y=v.y*m;
+    vf.z=v.z*m;
+    return vf;
+}
+
