@@ -1,0 +1,4 @@
+x,offset: 92
+y,offset: 2439
+z,offset: 1706
+
