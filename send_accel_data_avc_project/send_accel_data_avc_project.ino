@@ -32,6 +32,8 @@ double dt_p;
 Vec accel;
 Vec accel_euler;
 Vec gyro;
+Vec accel_gyro_delta;
+Vec heading_delta;
 Quat o;
 Quat w;                                                                    
 Quat nq;
@@ -116,11 +118,14 @@ if ( imu.dataReady() ) // If new IMU data is available
 
 	acc_total_vector = sqrt((accel.x*accel.x)+(accel.y*accel.y)+(accel.z*accel.z));       //Calculate the total accelerometer vector.
 	
+    //this is =gyro.y
 	if(abs(accel.x) < acc_total_vector){
-        accel_euler.x = -asin((float)accel.x/acc_total_vector);
+        accel_euler.y = asin((float)accel.x/acc_total_vector);
 	}
+
+    //this is =gyro.x
 	if(abs(accel.y) < acc_total_vector){
-		accel_euler.y = asin((float)accel.y/acc_total_vector);
+		accel_euler.x = -asin((float)accel.y/acc_total_vector);
 	}
 
 	gyro.x=imu.gx/GYRO_DPS * DEGREES_TO_RADIANS;//x is roll
@@ -129,17 +134,22 @@ if ( imu.dataReady() ) // If new IMU data is available
 
 
 	updateQuatByRotation(o,gyro,dt_p,w,nq);//need to be exact 300us
+
 	toEulerAngle(o,roll,pitch,yaw);//500 us 
 
+    //complimentary accell
+    accel_gyro_delta.x=accel_euler.x-roll;
+    accel_gyro_delta.y=accel_euler.y-pitch;
+    accel_gyro_delta.z=0;//gyro.z;//0;//to bad yaw will drift...
+    updateQuatByRotation(o,accel_gyro_delta,.005,w,nq);//1% correct with accell,may bet to high 300us
+	toEulerAngle(o,roll,pitch,yaw);//500 us 
+
+
     imuLog="";
-    imuLog += String(yaw) + ",";
-    imuLog += String(pitch) + ",";
-    imuLog += String(roll) + ",";
-
-
+ 
 
     //imu.computeEulerAngles2(false);
-    float header=imu.computeCompassHeading();
+//    float header=imu.computeCompassHeading();
 
  ///imuLog += String(imu.mx) + ",";
  ///imuLog += String(imu.my) + ",";
@@ -176,13 +186,64 @@ if ( imu.dataReady() ) // If new IMU data is available
    float my=hard_fix_y*scale_y; 
    float mz=hard_fix_z*scale_z; 
 
- /// imuLog += String(mx) + ",";
- /// imuLog += String(my) + ",";
+//imuLog += String(mx) + ",";
+//imuLog += String(my) + ",";
  /// imuLog += String(mz) + ",";
 
-	float	heading = atan2(mx, my);
+   float heading;
+   //compute compas heading
+	if (my == 0){
+		heading = (mx < 0) ? 3.14 : 0;
+	}else{
+		heading = atan2(mx, my);
+    }
+
+    heading = heading*-1;
+
+	float a = heading - yaw;
+	if(a>3.14){
+		a-=6.28;
+	}else{
+		if(a<-3.14){
+			a+=6.28;
+		}
+	}
+
+	//a += (a>180) ? -360 : (a<-180) ? 360 : 0
+		
+    //float diff_angle = 3.14 - abs(abs(heading - yaw ) - 3.14); 
+//  imuLog += String(heading);
     
-    //imuLog += String(heading) + ",";
+    //3.11
+    //-3.14 =
+    
+   // yaw = -heading;
+   //update the quat by headking 
+  heading_delta.x=0;
+  heading_delta.y=0;
+  heading_delta.z=a;
+  updateQuatByRotation(o,heading_delta,.005,w,nq);//1% correct with accell,may bet to high 300us
+
+toEulerAngle(o,roll,pitch,yaw);//500 us 
+
+imuLog += String(yaw) + ",";
+imuLog += String(pitch) + ",";
+imuLog += String(roll) + ",";
+
+
+
+////if (heading > PI){ 
+////    heading -= (2 * PI);
+////} else if (heading < -PI){ 
+////    heading += (2 * PI);
+////} else if (heading < 0) {
+////    heading += 2 * PI;
+////}
+////
+////heading*= 180.0 / PI;
+////
+////imuLog += String(heading) + ",";
+
 
 
 
