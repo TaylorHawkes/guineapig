@@ -1,8 +1,10 @@
-
 #include <SparkFunMPU9250-DMP.h> // Include SparkFun MPU-9250-DMP library
 #include <SD.h>
 
-#define LOG_PORT SERIAL_PORT_USBVIRTUAL
+//this logs to mico html
+//#define LOG_PORT SERIAL_PORT_USBVIRTUAL
+//this logs to hardware
+#define LOG_PORT SERIAL_PORT_HARDWARE
 #define SERIAL_BAUD_RATE 57600 // Serial port baud
 #define INTERRUPT_PIN 4 // MPU-9250 INT pin tied to D4
 #define SAMPLE_RATE 200  //10Hz.
@@ -151,16 +153,25 @@ if ( imu.dataReady() ) // If new IMU data is available
     //imu.computeEulerAngles2(false);
 //    float header=imu.computeCompassHeading();
 
- ///imuLog += String(imu.mx) + ",";
- ///imuLog += String(imu.my) + ",";
- ///imuLog += String(imu.mz) + ",";
+///  imuLog += String(imu.mx) + ",";
+///  imuLog += String(imu.my) + ",";
+///  imuLog += String(imu.mz) + ",";
 
-  int xmax=890;
-  int xmin=172;
-  int ymax=466;
-  int ymin=-250;
-  int zmax=-26;
-  int zmin=-750;
+//int xmax=890;
+//int xmin=172;
+//int ymax=466;
+//int ymin=-250;
+//int zmax=-26;
+//int zmin=-750;
+
+    int xmax=1042;
+    int xmin=322;
+    int ymax=614;
+    int ymin=-110;
+    int zmax=-79;
+    int zmin=-915;
+
+
 
   int offset_x = (xmax + xmin) / 2;
   int offset_y = (ymax + ymin) / 2;
@@ -186,9 +197,9 @@ if ( imu.dataReady() ) // If new IMU data is available
    float my=hard_fix_y*scale_y; 
    float mz=hard_fix_z*scale_z; 
 
-//imuLog += String(mx) + ",";
-//imuLog += String(my) + ",";
- /// imuLog += String(mz) + ",";
+/// imuLog += String(mx) + ",";
+/// imuLog += String(my) + ",";
+/// imuLog += String(mz) + ",";
 
    float heading;
    //compute compas heading
@@ -219,16 +230,16 @@ if ( imu.dataReady() ) // If new IMU data is available
     
    // yaw = -heading;
    //update the quat by headking 
-  heading_delta.x=0;
-  heading_delta.y=0;
-  heading_delta.z=a;
-  updateQuatByRotation(o,heading_delta,.005,w,nq);//1% correct with accell,may bet to high 300us
+heading_delta.x=0;
+heading_delta.y=0;
+heading_delta.z=a;
+updateQuatByRotation(o,heading_delta,.005,w,nq);//1% correct with accell,may bet to high 300us
 
 toEulerAngle(o,roll,pitch,yaw);//500 us 
 
-imuLog += String(yaw) + ",";
-imuLog += String(pitch) + ",";
-imuLog += String(roll) + ",";
+ imuLog += String(yaw) + ",";
+ imuLog += String(pitch) + ",";
+ imuLog += String(roll) + ",";
 
 
 
