@@ -2,7 +2,7 @@
 #include <SparkFunMPU9250-DMP.h> // Include SparkFun MPU-9250-DMP library
 #include <SD.h>
 
-#define LOG_PORT SERIAL_PORT_USBVIRTUAL
+#define LOG_PORT SERIAL_PORT_HARDWARE
 #define SERIAL_BAUD_RATE 57600 // Serial port baud
 #define INTERRUPT_PIN 4 // MPU-9250 INT pin tied to D4
 #define SAMPLE_RATE 200  //10Hz.
@@ -29,6 +29,7 @@ typedef struct {
 double roll,pitch,yaw;
 double dt;
 double dt_p;
+
 Vec accel;
 Vec accel_euler;
 Vec gyro;
