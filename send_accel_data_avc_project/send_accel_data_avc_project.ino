@@ -1,12 +1,8 @@
 #include <SparkFunMPU9250-DMP.h> // Include SparkFun MPU-9250-DMP library
 #include <SD.h>
 
-<<<<<<< HEAD
-=======
 //this logs to mico html
 //#define LOG_PORT SERIAL_PORT_USBVIRTUAL
-//this logs to hardware
->>>>>>> ff38d007c36a71a2853ffb83303f2c3b639df77f
 #define LOG_PORT SERIAL_PORT_HARDWARE
 #define SERIAL_BAUD_RATE 57600 // Serial port baud
 #define INTERRUPT_PIN 4 // MPU-9250 INT pin tied to D4
@@ -20,14 +16,14 @@ float GYRO_DPS =16.4;//https://cdn.sparkfun.com/assets/learn_tutorials/5/5/0/MPU
 
 
 typedef struct {
-    float x,y,z;                                                                              
+float x,y,z;                                                                              
 } Vec;
 
 typedef struct {                                                                              
-    float x=0;
-	float y=0;
-	float z=0;
-	float w=1;
+float x=0;
+float y=0;
+float z=0;
+float w=1;
 } Quat;
 
 
@@ -49,15 +45,15 @@ String imuLog;
 
 void setup()
 {
-   Wire.begin(); // join i2c bus (address optional for master)
-   LOG_PORT.begin(SERIAL_BAUD_RATE);
-	if (imu.begin() != INV_SUCCESS){
-       LOG_PORT.println("could not start");
-        return;
-	}
-    pinMode(INTERRUPT_PIN, INPUT_PULLUP); // Set interrupt as an input w/ pull-up resistor
-    // Use enableInterrupt() to configure the MPU-9250's 
-    // interrupt output as a "data ready" indicator.
+Wire.begin(); // join i2c bus (address optional for master)
+LOG_PORT.begin(SERIAL_BAUD_RATE);
+if (imu.begin() != INV_SUCCESS){
+   LOG_PORT.println("could not start");
+    return;
+}
+pinMode(INTERRUPT_PIN, INPUT_PULLUP); // Set interrupt as an input w/ pull-up resistor
+// Use enableInterrupt() to configure the MPU-9250's 
+// interrupt output as a "data ready" indicator.
     imu.enableInterrupt();
     // The interrupt level can either be active-high or low. Configure as active-low.
     // Options are INT_ACTIVE_LOW or INT_ACTIVE_HIGH
@@ -150,6 +146,7 @@ if ( imu.dataReady() ) // If new IMU data is available
     updateQuatByRotation(o,accel_gyro_delta,.005,w,nq);//1% correct with accell,may bet to high 300us
 	toEulerAngle(o,roll,pitch,yaw);//500 us 
 
+    
 
     imuLog="";
  
@@ -241,9 +238,11 @@ updateQuatByRotation(o,heading_delta,.005,w,nq);//1% correct with accell,may bet
 
 toEulerAngle(o,roll,pitch,yaw);//500 us 
 
- imuLog += String(yaw) + ",";
- imuLog += String(pitch) + ",";
- imuLog += String(roll) + ",";
+LOG_PORT.println(yaw);
+//imuLog += String(yaw)+",";
+// imuLog += String(yaw) + ",";
+// imuLog += String(pitch) + ",";
+// imuLog += String(roll) + ",";
 
 
 
@@ -290,7 +289,7 @@ toEulerAngle(o,roll,pitch,yaw);//500 us
 	//  imuLog += String(imu.roll, 2) + ", ";
 	//  imuLog += String(imu.yaw, 2) + ", ";
 
-	write_to_ardunio(imuLog);
+	//write_to_ardunio(imuLog);
 
 }
 }

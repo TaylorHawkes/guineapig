@@ -13,6 +13,7 @@ gpsSerial.begin(57600);
 
 }
 void loop(){
+
   if (gpsSerial.available()){
       Serial.write(gpsSerial.read());
   }
