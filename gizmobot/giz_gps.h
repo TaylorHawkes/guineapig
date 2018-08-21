@@ -1,10 +1,11 @@
-#ifndef __GIZ_COMPASS_
-#define __GIZ_COMPASS_
+#ifndef __GIZ_GPS_
+#define __GIZ_GPS_
 
-class GizCompass {
+class GizGps{
 
 public:
-  float heading;
+  float y_pos;
+  float x_pos;
   
 public:
   void init();

@@ -1,4 +1,4 @@
-//#include "giz_gps.h"
+#include "giz_gps.h"
 #include "giz_compass.h"
 //#include "giz_wheel_encoder.h"
 
@@ -14,13 +14,12 @@ double dt,last_micros;
 //  };
 
 GizCompass giz_compass;
+GizGps giz_gps;
 
 void setup() {
 
-//setup gps 
-//    GizGps.init();
-//setup compass
- giz_compass.init();
+giz_compass.init();
+giz_gps.init();
 
 Serial.begin(57600);
 
@@ -43,10 +42,13 @@ void loop() {
     //if(1hz_loop)
 
     //get our position && heading
-    update_position(); 
+    giz_compass.update();
+    giz_gps.update();
+
+    //update_position(); 
     Serial.println(giz_compass.heading);
-    update_current_heading();
-    update_desired_heading();
+   // update_current_heading();
+   // update_desired_heading();
     turn_to_desired_heading();
 
 // if(1hz_loop){

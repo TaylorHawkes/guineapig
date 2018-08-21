@@ -1,7 +1,6 @@
 #include "giz_compass.h"
-#include <AltSoftSerial.h>
-p
-AltSoftSerial mySerial;
+#include <SoftSerial.h>
+Softwar Serial mySerial;
 
  char temp_heading[200];
  int c=0; 
