@@ -1,23 +1,18 @@
+#include "HardwareSerial.h"
 #include "giz_compass.h"
-#include <AltSoftSerial.h>
-p
-AltSoftSerial mySerial;
 
- char temp_heading[200];
- int c=0; 
+
+static char temp_heading[200];
+static int c=0; 
 
 void GizCompass::init(){
-    mySerial.begin(57600);
-
+    Serial1.begin(57600);
 }
 
-//Update to most recent value, but dont block
-//(may want to consider a little blocking)
-//should be ran at 50hz or greater
 void GizCompass::update(){
-    if(int l=mySerial.available()){
+    if(int l=Serial1.available()){
             for (int i = 0; i < l; i++){
-               char t= mySerial.read();
+               char t= Serial1.read();
                if(t=='\n'){
                    temp_heading[c]='\0';
                    heading=atof(temp_heading);

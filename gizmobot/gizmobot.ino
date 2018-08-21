@@ -21,7 +21,7 @@ void setup() {
 giz_compass.init();
 giz_gps.init();
 
-Serial.begin(57600);
+//Serial.begin(57600);
 
 //setup wheel encoder 
 
@@ -42,14 +42,14 @@ void loop() {
     //if(1hz_loop)
 
     //get our position && heading
-    giz_compass.update();
+   // giz_compass.update();
     giz_gps.update();
 
     //update_position(); 
-    Serial.println(giz_compass.heading);
+   // Serial.println(giz_compass.heading);
    // update_current_heading();
    // update_desired_heading();
-    turn_to_desired_heading();
+   // turn_to_desired_heading();
 
 // if(1hz_loop){
 //    if(did_hit_waypoint()){
