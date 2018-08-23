@@ -164,8 +164,9 @@ const unsigned char ubxRate5Hz[] PROGMEM = { 0x06,0x08,0x06,0x00,0xC8,0x00,0x01,
 }
 
 void setup(){
-Serial.begin(9600);
-init_gps();
+Serial.begin(115200);
+Serial1.begin(115200);
+//init_gps();
 }
 void loop(){
 
@@ -185,11 +186,10 @@ void loop(){
 
 while (Serial1.available() > 0) {
 	//Serial.write(Serial1.read());
- // gps.encode(Serial1.read());
+  gps.encode(Serial1.read());
 }
   
     if (gps.location.isUpdated()){
-                Serial.print("--------------");
                 Serial.print(gps.location.lat(),10);
                 Serial.print(",");
                 Serial.println(gps.location.lng(),10);
