@@ -1,0 +1,81 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+<style>
+#canvas{
+    background:#ddd;
+}
+</style>
+<head>
+
+<body>
+<div id="canvas_holder_outer">
+      <canvas id="canvas" height="600" width="600" ></canvas> 
+</body>
+</html>
+
+<script>
+//https://robotics.stackexchange.com/questions/1653/calculate-position-of-differential-drive-robot
+var x_pos=100;
+var y_pos=100;
+var heading=1.8;
+
+var c=document.getElementById("canvas");
+var ctx=c.getContext("2d");
+ctx.transform(1, 0, 0, -1, 0, 600)
+
+ctx.beginPath();
+ctx.moveTo(x_pos,y_pos);
+ctx.lineTo(x_pos + 30 * Math.cos(heading), y_pos + 30 * Math.sin(heading));
+ctx.stroke();
+
+//change is in meters
+var unitsAxisWidth=.2;//axil .2 meters
+var leftDelta=1;//go about one meter
+var rightDelta=1;
+
+function paint_robot(){
+  	//ctx.clearRect(0,0,600,600);
+	ctx.beginPath();
+	ctx.moveTo(x_pos,y_pos);
+	ctx.lineTo(x_pos + 30 * Math.cos(heading), y_pos + 30 * Math.sin(heading));
+	ctx.stroke();
+}
+
+
+setInterval(function(){ 
+if (Math.abs(leftDelta - rightDelta) < 0.00001){ 
+	x_pos = x_pos + leftDelta * Math.cos(heading);
+	y_pos = y_pos + rightDelta * Math.sin(heading);
+	paint_robot();
+} else {
+    var  turningRadius = unitsAxisWidth * (leftDelta + rightDelta) / (2 * (rightDelta - leftDelta));
+
+
+    var wd = (rightDelta - leftDelta) / unitsAxisWidth;
+
+
+    x_pos = x_pos + turningRadius * Math.sin(wd + heading) - turningRadius * Math.sin(heading);
+    y_pos = y_pos - turningRadius * Math.cos(wd + heading) + turningRadius * Math.cos(heading);
+
+    heading = boundAngle(heading + wd);
+	console.log(heading);
+	paint_robot();
+}
+    
+}, 10);
+
+function boundAngle(a) {
+	while(a <= -1*Math.PI) {
+		a += 2*Math.PI;
+	}
+	while(a > Math.PI) {
+		a -= 2* Math.PI;
+	}
+	return a;
+}
+
+
+</script>
+
+

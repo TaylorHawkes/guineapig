@@ -184,10 +184,7 @@ void loop(){
 //      }
 //  delay(10000000);
 
-while (Serial1.available() > 0) {
-	//Serial.write(Serial1.read());
-  gps.encode(Serial1.read());
-}
+
   
     if (gps.location.isUpdated()){
                 Serial.print(gps.location.lat(),10);
